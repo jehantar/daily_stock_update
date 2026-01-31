@@ -1,7 +1,7 @@
 # Sentiment Tracker - Specification
 
 ## Overview
-Automated daily stock monitoring system that analyzes portfolio movements, tracks earnings, and delivers actionable insights via email.
+Automated daily stock monitoring system that analyzes portfolio movements, tracks earnings, and delivers actionable insights via email with fundamental trend visualizations.
 
 ---
 
@@ -24,6 +24,12 @@ Automated daily stock monitoring system that analyzes portfolio movements, track
 - **Source Priority**: Company press releases (via news aggregation)
 - **Content**: Key metrics, guidance, notable quotes, market reaction
 
+### 4. Fundamental Trends (Charts)
+- **Data Source**: Nasdaq Data Link SHARADAR/SF1 dataset
+- **History Depth**: 6 quarters
+- **Visualization**: Line charts with markers, embedded as CID attachments
+- **Outlier Handling**: IQR-based detection with axis capping and value annotations
+
 ---
 
 ## Data Flow
@@ -34,13 +40,13 @@ Automated daily stock monitoring system that analyzes portfolio movements, track
 │  (CSV tickers)  │     │  (Python script) │     │  (Daily email)  │
 └─────────────────┘     └────────┬─────────┘     └─────────────────┘
                                 │
-                   ┌────────────┼────────────┐
-                   ▼            ▼            ▼
-             ┌──────────┐ ┌──────────┐ ┌──────────┐
-             │ Yahoo    │ │ Finnhub  │ │ OpenAI   │
-             │ Finance  │ │ API      │ │ API      │
-             │ (prices) │ │(earnings)│ │ (AI)     │
-             └──────────┘ └──────────┘ └──────────┘
+                   ┌────────────┼────────────┬────────────┐
+                   ▼            ▼            ▼            ▼
+             ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌──────────┐
+             │ Yahoo    │ │ Finnhub  │ │ OpenAI   │ │ Nasdaq   │
+             │ Finance  │ │ API      │ │ API      │ │ Data Link│
+             │ (prices) │ │(earnings)│ │ (AI)     │ │(fundmtls)│
+             └──────────┘ └──────────┘ └──────────┘ └──────────┘
 ```
 
 ---
@@ -82,11 +88,52 @@ Automated daily stock monitoring system that analyzes portfolio movements, track
    - Next earnings date for each
    - Sorted by date
 
+5. **Fundamental Trends**: Two charts per ticker
+   - Growth chart: Revenue, EPS, FCF (QoQ % change)
+   - Profitability chart: ROE, ROA, Gross Margin, Net Margin (%)
+
 ### Email Behavior
 - **Quiet days**: No email sent if no >5% movers AND no earnings news
 - **Market holidays**: Skip email entirely
 - **Send time**: 3 PM Pacific on weekdays
 - **Recipient**: Same Gmail account that sends it
+
+---
+
+## Fundamental Charts Specification
+
+### Metrics
+
+**Growth Chart (QoQ % change)**
+| Metric | Source Field | Color |
+|--------|--------------|-------|
+| Revenue | `revenueusd` | Blue (#3b82f6) |
+| EPS | `eps` | Green (#16a34a) |
+| Free Cash Flow | `fcf` | Amber (#f59e0b) |
+
+**Profitability Chart (absolute %)**
+| Metric | Source Field | Color |
+|--------|--------------|-------|
+| ROE | `roe` | Purple (#8b5cf6) |
+| ROA | `roa` | Cyan (#06b6d4) |
+| Gross Margin | `grossmargin` | Teal (#14b8a6) |
+| Net Margin | `netmargin` | Pink (#ec4899) |
+
+### Chart Configuration
+- **Size**: 3.2 × 2.0 inches at 120 DPI
+- **Type**: Line chart with circular markers
+- **Grid**: Horizontal and vertical gridlines
+- **Legend**: Positioned below chart
+
+### Outlier Handling
+- **Detection**: IQR-based (values beyond 2× IQR from quartiles)
+- **Display**: Axis capped at bounds, outlier values annotated
+- **Indicators**: Arrow markers (▲/▼) show direction of extreme values
+
+### Email Embedding
+- **Method**: CID (Content-ID) attachments
+- **Format**: PNG images attached to MIME message
+- **Reference**: `<img src="cid:growth_ticker">` in HTML
 
 ---
 
@@ -134,6 +181,7 @@ Instructions:
 | `GMAIL_APP_PASSWORD` | Gmail App Password (not regular password) |
 | `OPENAI_API_KEY` | OpenAI API key |
 | `FINNHUB_API_KEY` | Finnhub API key (free) |
+| `NASDAQ_DATA_LINK_API_KEY` | Nasdaq Data Link API key (SHARADAR subscription) |
 
 ### API Rate Limits
 | Service | Limit | Our Usage |
@@ -141,6 +189,7 @@ Instructions:
 | Yahoo Finance | Unofficial, ~2000/hr | ~50-100 calls/day |
 | Finnhub | 60 calls/min | ~50-100 calls/day |
 | OpenAI | Pay per token | ~10-50 calls/day |
+| Nasdaq Data Link | Varies by plan | ~2-4 calls/day |
 
 ---
 
@@ -163,6 +212,12 @@ Instructions:
 2. Copy API key from dashboard
 3. Save as `FINNHUB_API_KEY` secret
 
+### Nasdaq Data Link API Key
+1. Register at https://data.nasdaq.com
+2. Subscribe to SHARADAR Core US Fundamentals (SF1)
+3. Copy API key from account settings (20 characters)
+4. Save as `NASDAQ_DATA_LINK_API_KEY` secret
+
 ### GitHub Secrets Setup
 1. Go to your repo → Settings → Secrets and variables → Actions
 2. Click "New repository secret"
@@ -176,6 +231,8 @@ Instructions:
 - **No email on errors**: Silent failure, retry next day
 - **Missing ticker data**: Skip that ticker, continue with others
 - **Rate limits**: Implement delays between calls, fail gracefully
+- **Missing fundamentals**: Charts section skipped, email still sends
+- **Insufficient chart data**: Tickers with <2 quarters excluded from charts
 
 ---
 
@@ -187,13 +244,15 @@ sentiment_tracker/
 │   └── workflows/
 │       └── daily_report.yml      # GitHub Actions workflow
 ├── src/
-│   ├── main.py                   # Entry point
-│   ├── data_fetcher.py           # CSV + API data fetching
+│   ├── main.py                   # Entry point (8-step workflow)
+│   ├── data_fetcher.py           # CSV + Yahoo Finance data fetching
 │   ├── price_analyzer.py         # >5% movement detection
 │   ├── earnings_tracker.py       # Earnings calendar logic
 │   ├── news_aggregator.py        # Multi-source news gathering
 │   ├── ai_analyzer.py            # OpenAI API integration
-│   └── email_sender.py           # Gmail SMTP logic
+│   ├── fundamentals_fetcher.py   # Nasdaq Data Link integration
+│   ├── chart_generator.py        # matplotlib chart generation
+│   └── email_sender.py           # Gmail SMTP with CID images
 ├── requirements.txt              # Python dependencies
 ├── SPEC.md                       # This file
 └── README.md                     # Setup instructions
@@ -210,4 +269,8 @@ finnhub-python>=2.4.18    # Finnhub API client
 openai>=1.0.0             # OpenAI API
 beautifulsoup4>=4.12      # HTML parsing for news
 python-dateutil>=2.8      # Date handling
+nasdaq-data-link>=1.0.0   # Nasdaq Data Link API
+matplotlib>=3.7.0         # Chart generation
+pandas>=2.0.0             # Data manipulation
+numpy>=1.24.0             # Numerical operations
 ```

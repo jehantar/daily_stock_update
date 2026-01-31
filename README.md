@@ -7,6 +7,7 @@ Automated daily stock monitoring that delivers AI-analyzed insights via email.
 - **Big Movers Alert**: Stocks with >5% daily change, with AI-synthesized explanation
 - **Earnings Calendar**: Reminder 1 day before scheduled earnings calls
 - **Earnings Summaries**: Key insights from recent earnings reports
+- **Fundamental Trends**: Quarterly line charts showing growth and profitability metrics
 - **Full Earnings Calendar**: Table showing next earnings date for all tracked tickers
 
 ## Quick Start
@@ -38,6 +39,11 @@ Create a CSV with your stock tickers. The system reads tickers from column C (in
 1. Register at [finnhub.io](https://finnhub.io/register)
 2. Copy API key from dashboard
 
+#### Nasdaq Data Link API Key
+1. Register at [data.nasdaq.com](https://data.nasdaq.com)
+2. Subscribe to SHARADAR/SF1 dataset
+3. Copy API key from account settings
+
 ### 4. Configure GitHub Secrets
 
 1. Create a new GitHub repository
@@ -52,6 +58,7 @@ Create a CSV with your stock tickers. The system reads tickers from column C (in
 | `GMAIL_APP_PASSWORD` | The 16-character app password |
 | `OPENAI_API_KEY` | Your OpenAI API key |
 | `FINNHUB_API_KEY` | Your Finnhub API key |
+| `NASDAQ_DATA_LINK_API_KEY` | Your Nasdaq Data Link API key |
 
 ### 5. Enable GitHub Actions
 
@@ -73,6 +80,24 @@ The email includes:
 - Upcoming earnings alerts
 - Post-earnings summaries
 - Earnings calendar for all tickers
+- Fundamental trend charts (Growth & Profitability)
+
+## Fundamental Trends Charts
+
+Each ticker includes two line charts showing 6 quarters of history:
+
+**Growth Chart**
+- Revenue growth (QoQ %)
+- EPS growth (QoQ %)
+- Free Cash Flow growth (QoQ %)
+
+**Profitability Chart**
+- Return on Equity (ROE %)
+- Return on Assets (ROA %)
+- Gross Margin %
+- Net Margin %
+
+Charts include smart axis scaling - extreme outliers are capped with annotations showing actual values.
 
 ## Local Development
 
@@ -86,6 +111,7 @@ export GMAIL_ADDRESS="you@gmail.com"
 export GMAIL_APP_PASSWORD="xxxx xxxx xxxx xxxx"
 export OPENAI_API_KEY="sk-..."
 export FINNHUB_API_KEY="..."
+export NASDAQ_DATA_LINK_API_KEY="..."
 
 # Run
 python src/main.py
@@ -97,15 +123,17 @@ python src/main.py
 sentiment_tracker/
 ├── .github/workflows/daily_report.yml
 ├── src/
-│   ├── main.py              # Entry point
-│   ├── data_fetcher.py      # CSV/Gist fetching, Yahoo Finance prices
-│   ├── price_analyzer.py    # >5% movement detection
-│   ├── earnings_tracker.py  # Finnhub earnings calendar
-│   ├── news_aggregator.py   # Multi-source news
-│   ├── ai_analyzer.py       # OpenAI gpt-5-mini integration
-│   └── email_sender.py      # Gmail SMTP
+│   ├── main.py               # Entry point
+│   ├── data_fetcher.py       # CSV/Gist fetching, Yahoo Finance prices
+│   ├── price_analyzer.py     # >5% movement detection
+│   ├── earnings_tracker.py   # Finnhub earnings calendar
+│   ├── news_aggregator.py    # Multi-source news
+│   ├── ai_analyzer.py        # OpenAI gpt-5-mini integration
+│   ├── fundamentals_fetcher.py  # Nasdaq Data Link fundamentals
+│   ├── chart_generator.py    # matplotlib line charts
+│   └── email_sender.py       # Gmail SMTP with embedded images
 ├── requirements.txt
-├── SPEC.md                  # Full specification
+├── SPEC.md                   # Full specification
 └── README.md
 ```
 
@@ -123,3 +151,12 @@ sentiment_tracker/
 **Missing earnings data?**
 - Finnhub free tier has rate limits
 - Some smaller stocks may not have earnings calendar data
+
+**Charts not rendering?**
+- Verify Nasdaq Data Link API key is valid (20 characters)
+- Check you have SHARADAR/SF1 subscription active
+- Charts require at least 2 quarters of data
+
+**Charts showing broken images?**
+- Gmail blocks data URIs; we use CID attachments which should work
+- Try viewing the email in a different client
