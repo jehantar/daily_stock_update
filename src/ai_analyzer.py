@@ -1,4 +1,5 @@
 import os
+import time
 from google import genai
 from src.news_aggregator import NewsItem, format_news_for_prompt
 from src.price_analyzer import PriceMover, format_change
@@ -6,6 +7,8 @@ from src.earnings_tracker import EarningsEvent
 
 # Initialize client globally
 _client = None
+_last_request_time = 0
+MIN_REQUEST_INTERVAL = 4.5  # seconds between requests (safe for 15 RPM limit)
 
 def get_gemini_client():
     """Initialize Gemini client."""
@@ -16,6 +19,14 @@ def get_gemini_client():
             raise ValueError("GEMINI_API_KEY environment variable not set")
         _client = genai.Client(api_key=api_key)
     return _client
+
+def rate_limit():
+    """Enforce rate limiting between API calls."""
+    global _last_request_time
+    elapsed = time.time() - _last_request_time
+    if elapsed < MIN_REQUEST_INTERVAL:
+        time.sleep(MIN_REQUEST_INTERVAL - elapsed)
+    _last_request_time = time.time()
 
 
 def analyze_price_movement(mover: PriceMover, news_items: list[NewsItem]) -> str:
@@ -40,6 +51,7 @@ Instructions:
 - Write in a professional, concise style"""
 
     try:
+        rate_limit()
         response = client.models.generate_content(
             model="gemini-2.0-flash",
             contents=prompt
@@ -85,6 +97,7 @@ Instructions:
 - Write in a professional, concise style"""
 
     try:
+        rate_limit()
         response = client.models.generate_content(
             model="gemini-2.0-flash",
             contents=prompt
@@ -112,6 +125,7 @@ Provide 2-3 brief possible explanations for this move. Consider:
 Keep response under 60 words. Do not use markdown. Start with "Possible factors:"."""
 
     try:
+        rate_limit()
         response = client.models.generate_content(
             model="gemini-2.0-flash",
             contents=prompt

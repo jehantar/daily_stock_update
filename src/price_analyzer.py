@@ -24,7 +24,7 @@ def identify_movers(tickers: list[Ticker], threshold: float = 0.05) -> list[Pric
                 daily_change=ticker.daily_change,
                 extended_hours_change=extended_info.get("extended_change"),
                 current_price=extended_info.get("current_price"),
-                company_name=extended_info.get("name", ticker.symbol)
+                company_name=ticker.company_name or extended_info.get("name", ticker.symbol)
             ))
 
     # Sort by absolute change (largest moves first)

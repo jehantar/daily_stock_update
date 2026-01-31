@@ -13,7 +13,7 @@ Orchestrates the daily workflow:
 import sys
 from datetime import datetime
 
-from src.data_fetcher import fetch_tickers_from_gist
+from src.data_fetcher import fetch_tickers_from_gist, fetch_price_data
 from src.price_analyzer import identify_movers
 from src.earnings_tracker import get_upcoming_earnings, get_recent_earnings
 from src.news_aggregator import aggregate_news
@@ -55,22 +55,24 @@ def main():
     #     print("Market holiday detected. Skipping report.")
     #     return 0
 
-    # Step 1: Fetch tickers
+    # Step 1: Fetch ticker symbols from Gist
     print("Fetching tickers from Gist...")
     try:
-        tickers = fetch_tickers_from_gist()
-        print(f"Loaded {len(tickers)} tickers")
+        symbols = fetch_tickers_from_gist()
+        print(f"Loaded {len(symbols)} ticker symbols")
     except Exception as e:
         print(f"Error fetching tickers: {e}")
         return 1
 
-    if not tickers:
+    if not symbols:
         print("No tickers found. Exiting.")
         return 0
 
-    symbols = [t.symbol for t in tickers]
+    # Step 2: Fetch price data from Yahoo Finance
+    print("Fetching price data from Yahoo Finance...")
+    tickers = fetch_price_data(symbols)
 
-    # Step 2: Identify big movers (>5%)
+    # Step 3: Identify big movers (>5%)
     print("Analyzing price movements...")
     movers = identify_movers(tickers, threshold=0.05)
     print(f"Found {len(movers)} stocks with >5% movement")

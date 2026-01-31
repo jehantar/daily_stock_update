@@ -1,7 +1,6 @@
 import os
-import csv
 import requests
-from io import StringIO
+import yfinance as yf
 from dataclasses import dataclass
 
 
@@ -9,18 +8,21 @@ from dataclasses import dataclass
 class Ticker:
     symbol: str
     daily_change: float  # As decimal (e.g., -0.05 for -5%)
-    ytd_change: float | None = None
+    company_name: str = ""
 
 
-def fetch_tickers_from_gist() -> list[Ticker]:
-    """Fetch and parse ticker list from GitHub Gist CSV."""
+def fetch_tickers_from_gist() -> list[str]:
+    """Fetch ticker symbols from GitHub Gist.
+
+    Supports simple format: one ticker per line.
+    Lines starting with # are comments.
+    """
     gist_url = os.environ.get("GIST_URL")
     if not gist_url:
         raise ValueError("GIST_URL environment variable not set")
 
     # Convert Gist URL to raw URL if needed
     if "gist.github.com" in gist_url and "/raw" not in gist_url:
-        # Handle standard gist URLs
         gist_url = gist_url.replace("gist.github.com", "gist.githubusercontent.com")
         if not gist_url.endswith("/raw"):
             gist_url = gist_url + "/raw"
@@ -28,76 +30,76 @@ def fetch_tickers_from_gist() -> list[Ticker]:
     response = requests.get(gist_url, timeout=30)
     response.raise_for_status()
 
-    return parse_csv(response.text)
+    return parse_ticker_list(response.text)
 
 
-def parse_csv(csv_content: str) -> list[Ticker]:
-    """Parse CSV content into Ticker objects.
+def parse_ticker_list(content: str) -> list[str]:
+    """Parse ticker list from content.
 
-    Supports two formats:
-    1. Header row with 'Ticker', 'Daily Price Change' columns
-    2. No header: (empty), Category, Ticker, YTD%, Daily%, (empty)
+    Supports:
+    1. Simple list: one ticker per line
+    2. CSV with Ticker column
+    3. CSV format: (empty), Category, Ticker, ...
     """
-    tickers = []
-    lines = csv_content.strip().split('\n')
-
+    lines = content.strip().split('\n')
     if not lines:
-        return tickers
+        return []
 
-    # Check if first line is a header
-    first_line = lines[0].lower()
-    has_header = 'ticker' in first_line
+    symbols = []
 
-    if has_header:
-        reader = csv.DictReader(StringIO(csv_content))
-        for row in reader:
-            symbol = row.get("Ticker", "").strip().upper()
-            if not symbol:
-                continue
-            daily_change = parse_percentage(row.get("Daily Price Change", "0"))
-            ytd_change = parse_percentage(row.get("YTD Price Change"))
-            tickers.append(Ticker(
-                symbol=symbol,
-                daily_change=daily_change or 0,
-                ytd_change=ytd_change
-            ))
+    # Check if it's a CSV with multiple columns
+    first_line = lines[0]
+    if ',' in first_line:
+        # CSV format
+        for line in lines:
+            parts = [p.strip() for p in line.split(',')]
+            # Try to find the ticker (usually 3-5 uppercase letters)
+            for part in parts:
+                part = part.upper()
+                if part and 2 <= len(part) <= 5 and part.isalpha():
+                    symbols.append(part)
+                    break
     else:
-        # No header format: (empty), Category, Ticker, YTD%, Daily%, (empty)
-        reader = csv.reader(StringIO(csv_content))
-        for row in reader:
-            if len(row) < 5:
-                continue
-            symbol = row[2].strip().upper()
-            if not symbol:
-                continue
-            ytd_change = parse_percentage(row[3])
-            daily_change = parse_percentage(row[4])
+        # Simple list format
+        for line in lines:
+            line = line.strip()
+            if line and not line.startswith('#'):
+                symbol = line.upper().split()[0]  # Take first word
+                if symbol:
+                    symbols.append(symbol)
+
+    return list(dict.fromkeys(symbols))  # Remove duplicates, preserve order
+
+
+def fetch_price_data(symbols: list[str]) -> list[Ticker]:
+    """Fetch current price data from Yahoo Finance for all symbols."""
+    tickers = []
+
+    for symbol in symbols:
+        try:
+            stock = yf.Ticker(symbol)
+            info = stock.info
+
+            # Get daily change
+            current_price = info.get("currentPrice") or info.get("regularMarketPrice")
+            prev_close = info.get("previousClose") or info.get("regularMarketPreviousClose")
+
+            daily_change = 0.0
+            if current_price and prev_close and prev_close > 0:
+                daily_change = (current_price - prev_close) / prev_close
+
+            company_name = info.get("shortName") or info.get("longName") or symbol
+
             tickers.append(Ticker(
                 symbol=symbol,
-                daily_change=daily_change or 0,
-                ytd_change=ytd_change
+                daily_change=daily_change,
+                company_name=company_name
             ))
+            print(f"  {symbol}: {daily_change*100:+.1f}%")
+
+        except Exception as e:
+            print(f"  {symbol}: failed to fetch ({e})")
+            # Still add the ticker with 0 change so it's tracked
+            tickers.append(Ticker(symbol=symbol, daily_change=0.0, company_name=symbol))
 
     return tickers
-
-
-def parse_percentage(value: str | None) -> float | None:
-    """Parse percentage string to decimal. Handles '5%', '0.05', '-5%', etc."""
-    if not value:
-        return None
-
-    value = value.strip()
-    if not value:
-        return None
-
-    try:
-        if "%" in value:
-            return float(value.replace("%", "")) / 100
-        else:
-            num = float(value)
-            # If value > 1 or < -1, assume it's already a percentage
-            if abs(num) > 1:
-                return num / 100
-            return num
-    except ValueError:
-        return None
