@@ -53,7 +53,7 @@ Instructions:
     try:
         rate_limit()
         response = client.models.generate_content(
-            model="gemini-2.0-flash",
+            model="gemini-1.5-pro",
             contents=prompt
         )
         return response.text.strip()
@@ -99,7 +99,7 @@ Instructions:
     try:
         rate_limit()
         response = client.models.generate_content(
-            model="gemini-2.0-flash",
+            model="gemini-1.5-pro",
             contents=prompt
         )
         return response.text.strip()
@@ -127,7 +127,7 @@ Keep response under 60 words. Do not use markdown. Start with "Possible factors:
     try:
         rate_limit()
         response = client.models.generate_content(
-            model="gemini-2.0-flash",
+            model="gemini-1.5-pro",
             contents=prompt
         )
         return response.text.strip()
