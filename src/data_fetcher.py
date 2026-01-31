@@ -38,8 +38,7 @@ def parse_ticker_list(content: str) -> list[str]:
 
     Supports:
     1. Simple list: one ticker per line
-    2. CSV with Ticker column
-    3. CSV format: (empty), Category, Ticker, ...
+    2. CSV format: (empty), Category, Ticker, ...
     """
     lines = content.strip().split('\n')
     if not lines:
@@ -50,22 +49,22 @@ def parse_ticker_list(content: str) -> list[str]:
     # Check if it's a CSV with multiple columns
     first_line = lines[0]
     if ',' in first_line:
-        # CSV format
+        # CSV format: (empty), Category, Ticker, YTD%, Daily%, (empty)
+        # Ticker is in column index 2
         for line in lines:
             parts = [p.strip() for p in line.split(',')]
-            # Try to find the ticker (usually 3-5 uppercase letters)
-            for part in parts:
-                part = part.upper()
-                if part and 2 <= len(part) <= 5 and part.isalpha():
-                    symbols.append(part)
-                    break
+            if len(parts) >= 3:
+                ticker = parts[2].upper()
+                # Valid ticker: 1-5 alphanumeric chars, not a category name
+                if ticker and 1 <= len(ticker) <= 5 and ticker not in ('CORE', 'IRA', 'TICKER'):
+                    symbols.append(ticker)
     else:
-        # Simple list format
+        # Simple list format: one ticker per line
         for line in lines:
             line = line.strip()
             if line and not line.startswith('#'):
                 symbol = line.upper().split()[0]  # Take first word
-                if symbol:
+                if symbol and symbol not in ('CORE', 'IRA', 'TICKER'):
                     symbols.append(symbol)
 
     return list(dict.fromkeys(symbols))  # Remove duplicates, preserve order
