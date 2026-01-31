@@ -32,23 +32,51 @@ def fetch_tickers_from_gist() -> list[Ticker]:
 
 
 def parse_csv(csv_content: str) -> list[Ticker]:
-    """Parse CSV content into Ticker objects."""
+    """Parse CSV content into Ticker objects.
+
+    Supports two formats:
+    1. Header row with 'Ticker', 'Daily Price Change' columns
+    2. No header: (empty), Category, Ticker, YTD%, Daily%, (empty)
+    """
     tickers = []
-    reader = csv.DictReader(StringIO(csv_content))
+    lines = csv_content.strip().split('\n')
 
-    for row in reader:
-        symbol = row.get("Ticker", "").strip().upper()
-        if not symbol:
-            continue
+    if not lines:
+        return tickers
 
-        daily_change = parse_percentage(row.get("Daily Price Change", "0"))
-        ytd_change = parse_percentage(row.get("YTD Price Change"))
+    # Check if first line is a header
+    first_line = lines[0].lower()
+    has_header = 'ticker' in first_line
 
-        tickers.append(Ticker(
-            symbol=symbol,
-            daily_change=daily_change,
-            ytd_change=ytd_change
-        ))
+    if has_header:
+        reader = csv.DictReader(StringIO(csv_content))
+        for row in reader:
+            symbol = row.get("Ticker", "").strip().upper()
+            if not symbol:
+                continue
+            daily_change = parse_percentage(row.get("Daily Price Change", "0"))
+            ytd_change = parse_percentage(row.get("YTD Price Change"))
+            tickers.append(Ticker(
+                symbol=symbol,
+                daily_change=daily_change or 0,
+                ytd_change=ytd_change
+            ))
+    else:
+        # No header format: (empty), Category, Ticker, YTD%, Daily%, (empty)
+        reader = csv.reader(StringIO(csv_content))
+        for row in reader:
+            if len(row) < 5:
+                continue
+            symbol = row[2].strip().upper()
+            if not symbol:
+                continue
+            ytd_change = parse_percentage(row[3])
+            daily_change = parse_percentage(row[4])
+            tickers.append(Ticker(
+                symbol=symbol,
+                daily_change=daily_change or 0,
+                ytd_change=ytd_change
+            ))
 
     return tickers
 
