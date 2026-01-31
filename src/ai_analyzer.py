@@ -55,7 +55,7 @@ Instructions:
         response = client.chat.completions.create(
             model="gpt-5-mini",
             messages=[{"role": "user", "content": prompt}],
-            max_tokens=200
+            max_completion_tokens=200
         )
         return response.choices[0].message.content.strip()
     except Exception as e:
@@ -102,7 +102,7 @@ Instructions:
         response = client.chat.completions.create(
             model="gpt-5-mini",
             messages=[{"role": "user", "content": prompt}],
-            max_tokens=250
+            max_completion_tokens=250
         )
         return response.choices[0].message.content.strip()
     except Exception as e:
@@ -131,7 +131,7 @@ Keep response under 60 words. Do not use markdown. Start with "Possible factors:
         response = client.chat.completions.create(
             model="gpt-5-mini",
             messages=[{"role": "user", "content": prompt}],
-            max_tokens=100
+            max_completion_tokens=100
         )
         return response.choices[0].message.content.strip()
     except Exception as e:
