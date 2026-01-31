@@ -52,12 +52,14 @@ Instructions:
 
     try:
         rate_limit()
-        response = client.chat.completions.create(
+        response = client.responses.create(
             model="gpt-5-mini",
-            messages=[{"role": "user", "content": prompt}],
-            max_completion_tokens=200
+            input=prompt
         )
-        return response.choices[0].message.content.strip()
+        if response.output_text:
+            return response.output_text.strip()
+        else:
+            return "No analysis generated."
     except Exception as e:
         return f"Analysis unavailable: {str(e)}"
 
@@ -99,12 +101,14 @@ Instructions:
 
     try:
         rate_limit()
-        response = client.chat.completions.create(
+        response = client.responses.create(
             model="gpt-5-mini",
-            messages=[{"role": "user", "content": prompt}],
-            max_completion_tokens=250
+            input=prompt
         )
-        return response.choices[0].message.content.strip()
+        if response.output_text:
+            return response.output_text.strip()
+        else:
+            return "No earnings analysis generated."
     except Exception as e:
         return f"Earnings analysis unavailable: {str(e)}"
 
@@ -128,11 +132,13 @@ Keep response under 60 words. Do not use markdown. Start with "Possible factors:
 
     try:
         rate_limit()
-        response = client.chat.completions.create(
+        response = client.responses.create(
             model="gpt-5-mini",
-            messages=[{"role": "user", "content": prompt}],
-            max_completion_tokens=100
+            input=prompt
         )
-        return response.choices[0].message.content.strip()
+        if response.output_text:
+            return response.output_text.strip()
+        else:
+            return "Unable to generate speculative analysis."
     except Exception as e:
         return "Unable to generate speculative analysis."
