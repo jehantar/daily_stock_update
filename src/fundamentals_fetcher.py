@@ -83,7 +83,12 @@ def _download_sf1_chunk(
     }
 
     _rate_limit()
+
+    # Set API key and verify it's set
     ndl.ApiConfig.api_key = api_key
+    print(f"    API key set (length: {len(api_key) if api_key else 0}, starts with: {api_key[:8] if api_key and len(api_key) > 8 else 'N/A'}...)")
+    print(f"    Requesting {len(tickers)} tickers, dimension={dimension}, dates={start_date} to {end_date}")
+
     df = ndl.get_table("SHARADAR/SF1", paginate=True, **params)
 
     if df.empty:
@@ -107,8 +112,9 @@ def _fetch_sf1_data(
         try:
             chunk_df = _download_sf1_chunk(api_key, chunk, dimension, columns, start_date, end_date)
             frames.append(chunk_df)
+            print(f"    Chunk returned {len(chunk_df)} rows")
         except Exception as e:
-            print(f"  Warning: Failed to fetch chunk: {e}")
+            print(f"  Warning: Failed to fetch chunk: {type(e).__name__}: {e}")
             continue
 
     if not frames:
