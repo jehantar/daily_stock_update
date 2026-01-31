@@ -5,6 +5,42 @@ from email.mime.multipart import MIMEMultipart
 from datetime import datetime
 from src.price_analyzer import PriceMover, format_change
 from src.earnings_tracker import EarningsEvent, format_earnings_time
+from src.chart_generator import ChartPair
+
+
+def _generate_fundamentals_section(charts: dict[str, ChartPair]) -> str:
+    """Generate HTML section with fundamental metrics charts."""
+    if not charts:
+        return ""
+
+    html_parts = ['<h3>Fundamental Trends</h3>']
+
+    for ticker in sorted(charts.keys()):
+        chart_pair = charts[ticker]
+        html_parts.append(f"""
+<div style="margin-bottom: 24px;">
+    <h4 style="color: #2563eb; margin-bottom: 8px; margin-top: 16px;">{chart_pair.ticker} - {chart_pair.company_name}</h4>
+    <table style="width: 100%; border-collapse: collapse;">
+        <tr>
+            <td style="width: 50%; padding: 4px; vertical-align: top;">
+                <img src="data:image/png;base64,{chart_pair.growth_chart_base64}"
+                     alt="{chart_pair.ticker} Growth Metrics"
+                     style="width: 100%; max-width: 350px; height: auto;" />
+                <p style="font-size: 11px; color: #666; margin: 4px 0 0 0;">Growth (QoQ %): Revenue, EPS, FCF</p>
+            </td>
+            <td style="width: 50%; padding: 4px; vertical-align: top;">
+                <img src="data:image/png;base64,{chart_pair.profitability_chart_base64}"
+                     alt="{chart_pair.ticker} Profitability Metrics"
+                     style="width: 100%; max-width: 350px; height: auto;" />
+                <p style="font-size: 11px; color: #666; margin: 4px 0 0 0;">Profitability (%): ROE, ROA, Margins</p>
+            </td>
+        </tr>
+    </table>
+</div>
+<hr>
+""")
+
+    return "\n".join(html_parts)
 
 
 def send_daily_report(
@@ -12,6 +48,7 @@ def send_daily_report(
     upcoming_earnings: list[EarningsEvent],
     recent_earnings: list[tuple[EarningsEvent, str]],  # (event, summary)
     all_earnings: dict[str, EarningsEvent | None] = None,  # Full earnings calendar
+    fundamental_charts: dict[str, ChartPair] = None,  # Fundamental metrics charts
 ) -> bool:
     """Send the daily report email. Returns True if sent successfully."""
 
@@ -27,7 +64,7 @@ def send_daily_report(
         raise ValueError("Gmail credentials not set in environment")
 
     subject = generate_subject(movers, upcoming_earnings, recent_earnings)
-    html_body = generate_html_body(movers, upcoming_earnings, recent_earnings, all_earnings)
+    html_body = generate_html_body(movers, upcoming_earnings, recent_earnings, all_earnings, fundamental_charts)
 
     msg = MIMEMultipart("alternative")
     msg["Subject"] = subject
@@ -81,6 +118,7 @@ def generate_html_body(
     upcoming_earnings: list[EarningsEvent],
     recent_earnings: list[tuple[EarningsEvent, str]],
     all_earnings: dict[str, EarningsEvent | None] = None,
+    fundamental_charts: dict[str, ChartPair] = None,
 ) -> str:
     """Generate minimal HTML email body."""
     today = datetime.now().strftime("%B %d, %Y")
@@ -179,6 +217,10 @@ def generate_html_body(
 {"".join(styled_rows)}
 </table>
 """)
+
+    # Fundamental Trends Section
+    if fundamental_charts:
+        sections.append(_generate_fundamentals_section(fundamental_charts))
 
     return f"""
 <!DOCTYPE html>
