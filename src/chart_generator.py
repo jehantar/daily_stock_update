@@ -13,9 +13,9 @@ from src.fundamentals_fetcher import FundamentalData
 
 
 # Chart configuration
-CHART_WIDTH = 3.5  # inches
-CHART_HEIGHT = 2.2  # inches
-CHART_DPI = 100
+CHART_WIDTH = 3.0  # inches
+CHART_HEIGHT = 1.8  # inches
+CHART_DPI = 85  # Lower DPI for smaller file size
 
 # Colors
 COLORS = {
@@ -65,7 +65,7 @@ def _fig_to_base64(fig: plt.Figure) -> str:
     return img_base64
 
 
-def _create_grouped_bar_chart(
+def _create_line_chart(
     quarter_labels: list[str],
     metrics: dict[str, list[float | None]],
     colors: dict[str, str],
@@ -74,7 +74,7 @@ def _create_grouped_bar_chart(
     is_percentage: bool = True,
 ) -> plt.Figure:
     """
-    Create a grouped bar chart.
+    Create a line chart for tracking metrics over time.
 
     Args:
         quarter_labels: X-axis labels (e.g., ["Q1'24", "Q2'24"])
@@ -96,19 +96,17 @@ def _create_grouped_bar_chart(
         ax.set_yticks([])
         return fig
 
-    n_quarters = len(quarter_labels)
-    n_metrics = len(valid_metrics)
-    bar_width = 0.8 / n_metrics
-    x = np.arange(n_quarters)
+    x = np.arange(len(quarter_labels))
 
-    for i, (metric_name, values) in enumerate(valid_metrics.items()):
-        # Replace None with 0 for plotting (or np.nan to skip)
-        plot_values = [v if v is not None else 0 for v in values]
-        offset = (i - n_metrics / 2 + 0.5) * bar_width
-        bars = ax.bar(x + offset, plot_values, bar_width,
-                      label=metric_name.replace("_", " ").title(),
-                      color=colors.get(metric_name, "#999999"),
-                      edgecolor='none')
+    for metric_name, values in valid_metrics.items():
+        # Use np.nan for None values so lines break at missing data
+        plot_values = [v if v is not None else np.nan for v in values]
+        ax.plot(x, plot_values,
+                label=metric_name.replace("_", " ").title(),
+                color=colors.get(metric_name, "#999999"),
+                linewidth=2,
+                marker='o',
+                markersize=4)
 
     # Styling
     ax.set_xticks(x)
@@ -122,6 +120,7 @@ def _create_grouped_bar_chart(
 
     # Grid
     ax.yaxis.grid(True, color=COLORS["grid"], linewidth=0.5)
+    ax.xaxis.grid(True, color=COLORS["grid"], linewidth=0.5, alpha=0.5)
     ax.set_axisbelow(True)
 
     # Remove spines
@@ -131,12 +130,13 @@ def _create_grouped_bar_chart(
         ax.spines[spine].set_color(COLORS["grid"])
 
     # Legend
+    n_metrics = len(valid_metrics)
     ax.legend(loc='upper center', bbox_to_anchor=(0.5, -0.15),
-              ncol=min(n_metrics, 3), fontsize=6, frameon=False)
+              ncol=min(n_metrics, 4), fontsize=6, frameon=False)
 
     # Add zero line if there are negative values
     all_values = [v for values in valid_metrics.values() for v in values if v is not None]
-    if any(v < 0 for v in all_values):
+    if all_values and any(v < 0 for v in all_values):
         ax.axhline(y=0, color=COLORS["text"], linewidth=0.5, linestyle='-')
 
     fig.tight_layout()
@@ -144,7 +144,7 @@ def _create_grouped_bar_chart(
 
 
 def _create_growth_chart(data: FundamentalData) -> str:
-    """Create growth metrics chart (Revenue, EPS, FCF growth %)."""
+    """Create growth metrics line chart (Revenue, EPS, FCF growth %)."""
     quarter_labels = [_format_quarter(q) for q in data.quarters]
 
     metrics = {
@@ -159,7 +159,7 @@ def _create_growth_chart(data: FundamentalData) -> str:
         "fcf": COLORS["fcf"],
     }
 
-    fig = _create_grouped_bar_chart(
+    fig = _create_line_chart(
         quarter_labels=quarter_labels,
         metrics=metrics,
         colors=colors,
@@ -172,7 +172,7 @@ def _create_growth_chart(data: FundamentalData) -> str:
 
 
 def _create_profitability_chart(data: FundamentalData) -> str:
-    """Create profitability metrics chart (ROE, ROA, Gross Margin, Net Margin)."""
+    """Create profitability metrics line chart (ROE, ROA, Gross Margin, Net Margin)."""
     quarter_labels = [_format_quarter(q) for q in data.quarters]
 
     metrics = {
@@ -189,7 +189,7 @@ def _create_profitability_chart(data: FundamentalData) -> str:
         "net_margin": COLORS["net_margin"],
     }
 
-    fig = _create_grouped_bar_chart(
+    fig = _create_line_chart(
         quarter_labels=quarter_labels,
         metrics=metrics,
         colors=colors,
