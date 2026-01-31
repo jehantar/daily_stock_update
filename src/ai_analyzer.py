@@ -1,23 +1,26 @@
 import os
-import google.generativeai as genai
+from google import genai
 from src.news_aggregator import NewsItem, format_news_for_prompt
 from src.price_analyzer import PriceMover, format_change
 from src.earnings_tracker import EarningsEvent
 
+# Initialize client globally
+_client = None
 
-def get_gemini_model():
-    """Initialize Gemini model."""
-    api_key = os.environ.get("GEMINI_API_KEY")
-    if not api_key:
-        raise ValueError("GEMINI_API_KEY environment variable not set")
-
-    genai.configure(api_key=api_key)
-    return genai.GenerativeModel("gemini-1.5-flash")
+def get_gemini_client():
+    """Initialize Gemini client."""
+    global _client
+    if _client is None:
+        api_key = os.environ.get("GEMINI_API_KEY")
+        if not api_key:
+            raise ValueError("GEMINI_API_KEY environment variable not set")
+        _client = genai.Client(api_key=api_key)
+    return _client
 
 
 def analyze_price_movement(mover: PriceMover, news_items: list[NewsItem]) -> str:
     """Generate AI analysis of why a stock moved significantly."""
-    model = get_gemini_model()
+    client = get_gemini_client()
 
     news_context = format_news_for_prompt(news_items)
     direction = "up" if mover.daily_change > 0 else "down"
@@ -37,7 +40,10 @@ Instructions:
 - Write in a professional, concise style"""
 
     try:
-        response = model.generate_content(prompt)
+        response = client.models.generate_content(
+            model="gemini-2.0-flash",
+            contents=prompt
+        )
         return response.text.strip()
     except Exception as e:
         return f"Analysis unavailable: {str(e)}"
@@ -45,7 +51,7 @@ Instructions:
 
 def analyze_earnings_report(event: EarningsEvent, news_items: list[NewsItem]) -> str:
     """Generate AI summary of an earnings report."""
-    model = get_gemini_model()
+    client = get_gemini_client()
 
     news_context = format_news_for_prompt(news_items)
 
@@ -79,7 +85,10 @@ Instructions:
 - Write in a professional, concise style"""
 
     try:
-        response = model.generate_content(prompt)
+        response = client.models.generate_content(
+            model="gemini-2.0-flash",
+            contents=prompt
+        )
         return response.text.strip()
     except Exception as e:
         return f"Earnings analysis unavailable: {str(e)}"
@@ -87,7 +96,7 @@ Instructions:
 
 def generate_speculative_context(symbol: str, company_name: str, daily_change: float) -> str:
     """Generate brief speculative analysis when no news is found."""
-    model = get_gemini_model()
+    client = get_gemini_client()
 
     direction = "increase" if daily_change > 0 else "decrease"
     change_str = format_change(daily_change)
@@ -103,7 +112,10 @@ Provide 2-3 brief possible explanations for this move. Consider:
 Keep response under 60 words. Do not use markdown. Start with "Possible factors:"."""
 
     try:
-        response = model.generate_content(prompt)
+        response = client.models.generate_content(
+            model="gemini-2.0-flash",
+            contents=prompt
+        )
         return response.text.strip()
     except Exception as e:
         return "Unable to generate speculative analysis."
