@@ -53,7 +53,7 @@ Instructions:
     try:
         rate_limit()
         response = client.chat.completions.create(
-            model="gpt-4o-mini",
+            model="gpt-5-mini",
             messages=[{"role": "user", "content": prompt}],
             max_tokens=200
         )
@@ -100,7 +100,7 @@ Instructions:
     try:
         rate_limit()
         response = client.chat.completions.create(
-            model="gpt-4o-mini",
+            model="gpt-5-mini",
             messages=[{"role": "user", "content": prompt}],
             max_tokens=250
         )
@@ -129,7 +129,7 @@ Keep response under 60 words. Do not use markdown. Start with "Possible factors:
     try:
         rate_limit()
         response = client.chat.completions.create(
-            model="gpt-4o-mini",
+            model="gpt-5-mini",
             messages=[{"role": "user", "content": prompt}],
             max_tokens=100
         )
