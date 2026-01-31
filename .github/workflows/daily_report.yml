@@ -2,8 +2,8 @@ name: Daily Stock Report
 
 on:
   schedule:
-    # Run at 10 PM UTC (2 PM Pacific) on weekdays
-    - cron: '0 22 * * 1-5'
+    # Run at 11 PM UTC (3 PM Pacific) on weekdays
+    - cron: '0 23 * * 1-5'
   workflow_dispatch: # Allow manual trigger
 
 jobs:

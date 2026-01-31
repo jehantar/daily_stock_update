@@ -9,20 +9,18 @@ Automated daily stock monitoring system that analyzes portfolio movements, track
 
 ### 1. Price Movement Detection (>5% Movers)
 - **Threshold**: Daily price change exceeds ±5%
-- **Data Source**: User's CSV export (column: `Daily Price Change`) - treated as source of truth
-- **Extended Hours**: Fetch supplementary pre-market/after-hours data from Yahoo Finance to explain gaps
+- **Data Source**: Yahoo Finance for real-time price data
+- **Extended Hours**: Fetch supplementary pre-market/after-hours data to explain gaps
 - **Analysis Output**: AI-synthesized explanation of why the stock moved
 
 ### 2. Earnings Calendar Tracking
 - **Data Source**: Finnhub API (free tier) for earnings dates
 - **Reminder**: Alert in email 1 day before scheduled earnings call
-- **No sheet modification**: Earnings dates tracked in email only, not written to CSV
+- **Calendar View**: Table showing next earnings date for all tracked tickers
 
 ### 3. Earnings Report Summaries
 - **Trigger**: After a stock reports earnings
-- **Timing**:
-  - Preliminary summary same day (if earnings released before Action runs at 2-3 PM PT)
-  - Updated summary next trading day with market reaction included
+- **Timing**: Summary generated when workflow runs (3 PM Pacific)
 - **Source Priority**: Company press releases (via news aggregation)
 - **Content**: Key metrics, guidance, notable quotes, market reaction
 
@@ -35,28 +33,23 @@ Automated daily stock monitoring system that analyzes portfolio movements, track
 │  GitHub Gist    │────▶│  GitHub Action   │────▶│  Gmail SMTP     │
 │  (CSV tickers)  │     │  (Python script) │     │  (Daily email)  │
 └─────────────────┘     └────────┬─────────┘     └─────────────────┘
-                                 │
-                    ┌────────────┼────────────┐
-                    ▼            ▼            ▼
-              ┌──────────┐ ┌──────────┐ ┌──────────┐
-              │ Yahoo    │ │ Finnhub  │ │ Gemini   │
-              │ Finance  │ │ API      │ │ API      │
-              │ (prices) │ │(earnings)│ │ (AI)     │
-              └──────────┘ └──────────┘ └──────────┘
+                                │
+                   ┌────────────┼────────────┐
+                   ▼            ▼            ▼
+             ┌──────────┐ ┌──────────┐ ┌──────────┐
+             │ Yahoo    │ │ Finnhub  │ │ OpenAI   │
+             │ Finance  │ │ API      │ │ API      │
+             │ (prices) │ │(earnings)│ │ (AI)     │
+             └──────────┘ └──────────┘ └──────────┘
 ```
 
 ---
 
-## Input: CSV Format
+## Input: Ticker List
 
 **Location**: GitHub Gist (secret gist recommended)
-**Update Frequency**: Manual export when tickers change
-
-| Column | Required | Description |
-|--------|----------|-------------|
-| `Ticker` | Yes | Stock symbol (e.g., AAPL, GOOGL) |
-| `Daily Price Change` | Yes | Percentage change as decimal or percentage (e.g., -0.05 or -5%) |
-| `YTD Price Change` | No | For reference, not used in logic |
+**Update Frequency**: Manual update when tickers change
+**Format**: CSV with tickers in column C (index 2)
 
 **Expected portfolio size**: 20-50 tickers
 
@@ -71,45 +64,28 @@ Automated daily stock monitoring system that analyzes portfolio movements, track
 - Highlights most significant mover and upcoming earnings
 - Date appended for filtering
 
-### Body Format (Minimal HTML)
-Single ticker-centric list - each stock with all its relevant info grouped together:
+### Body Sections
+1. **Big Movers**: Stocks with >5% daily change
+   - Direction indicator (UP/DOWN)
+   - Extended hours movement if available
+   - AI-synthesized "Why it moved" analysis
 
-```html
-<h2>📊 Daily Stock Report - Jan 30, 2026</h2>
+2. **Upcoming Earnings**: Stocks reporting within 1 day
+   - Expected date and time (before/after market)
+   - EPS and revenue estimates
 
-<h3>TSLA - Tesla Inc</h3>
-<p><strong>🔴 DOWN 7.2%</strong> (Extended hours: additional -1.3%)</p>
-<p><strong>Why it moved:</strong> [AI-synthesized analysis]
-Tesla shares dropped following reports of production delays at the
-Berlin facility. Analyst downgrades from Morgan Stanley and concerns
-about EV demand in China contributed to selling pressure. No company
-statement issued.</p>
+3. **Recent Earnings**: Stocks that recently reported
+   - Beat/miss on EPS and revenue
+   - AI-generated summary of key insights
 
-<hr>
-
-<h3>NVDA - NVIDIA Corp</h3>
-<p><strong>⚠️ Earnings Tomorrow</strong> - Feb 1, 2026 (After Market Close)</p>
-<p>Expected EPS: $5.42 | Expected Revenue: $28.5B</p>
-
-<hr>
-
-<h3>AAPL - Apple Inc</h3>
-<p><strong>📋 Earnings Report Summary</strong> (Reported: Jan 29, 2026)</p>
-<p><strong>Results:</strong> Beat on EPS ($2.10 vs $2.05 expected),
-slight revenue miss ($119.5B vs $120.1B expected)</p>
-<p><strong>Key Insights:</strong></p>
-<ul>
-  <li>Services revenue hit all-time high of $22.3B</li>
-  <li>iPhone sales down 3% YoY in China</li>
-  <li>Raised dividend by 4%</li>
-</ul>
-<p><strong>Market Reaction:</strong> +2.3% in after-hours trading</p>
-```
+4. **Earnings Calendar**: Table of all tracked tickers
+   - Next earnings date for each
+   - Sorted by date
 
 ### Email Behavior
 - **Quiet days**: No email sent if no >5% movers AND no earnings news
 - **Market holidays**: Skip email entirely
-- **Send time**: After market close, ~2-3 PM Pacific
+- **Send time**: 3 PM Pacific on weekdays
 - **Recipient**: Same Gmail account that sends it
 
 ---
@@ -117,15 +93,13 @@ slight revenue miss ($119.5B vs $120.1B expected)</p>
 ## AI Analysis Specifications
 
 ### LLM Provider
-- **Primary**: Google Gemini API (free tier - 1,500 requests/day)
-- **Model**: gemini-1.5-flash (fast, cost-effective)
+- **Provider**: OpenAI
+- **Model**: gpt-5-mini (via Responses API)
 
 ### News Sources for Context
 Query these sources to gather context before AI synthesis:
 1. **Yahoo Finance** - Company news, analyst ratings
-2. **Google News** - Broader news coverage
-3. **Finnhub/Benzinga** - Financial-specific news (free tier)
-4. **SEC EDGAR** - 8-K filings for material events
+2. **Finnhub** - Financial-specific news (free tier)
 
 ### Analysis Prompt Structure
 ```
@@ -133,9 +107,6 @@ Analyze why {TICKER} ({COMPANY_NAME}) moved {PERCENT}% today.
 
 News context:
 {AGGREGATED_NEWS_SNIPPETS}
-
-SEC filings (if any):
-{RECENT_8K_SUMMARIES}
 
 Instructions:
 - If clear news explains the move, synthesize a 2-3 sentence explanation
@@ -151,25 +122,25 @@ Instructions:
 ## Infrastructure
 
 ### GitHub Actions Workflow
-- **Schedule**: `cron: '0 22 * * 1-5'` (2 PM Pacific on weekdays)
+- **Schedule**: `cron: '0 23 * * 1-5'` (3 PM Pacific on weekdays)
 - **Runner**: `ubuntu-latest`
 - **Timeout**: 10 minutes
 
 ### Required Secrets (GitHub Repo Settings)
-| Secret Name | Description | Setup Guide |
-|-------------|-------------|-------------|
-| `GIST_URL` | URL to your secret Gist with CSV | Create at gist.github.com |
-| `GMAIL_ADDRESS` | Your Gmail address | - |
-| `GMAIL_APP_PASSWORD` | Gmail App Password (not regular password) | See setup guide below |
-| `GEMINI_API_KEY` | Google AI Studio API key | See setup guide below |
-| `FINNHUB_API_KEY` | Finnhub API key (free) | See setup guide below |
+| Secret Name | Description |
+|-------------|-------------|
+| `GIST_URL` | URL to your secret Gist with ticker CSV |
+| `GMAIL_ADDRESS` | Your Gmail address |
+| `GMAIL_APP_PASSWORD` | Gmail App Password (not regular password) |
+| `OPENAI_API_KEY` | OpenAI API key |
+| `FINNHUB_API_KEY` | Finnhub API key (free) |
 
-### API Rate Limits (Free Tiers)
+### API Rate Limits
 | Service | Limit | Our Usage |
 |---------|-------|-----------|
 | Yahoo Finance | Unofficial, ~2000/hr | ~50-100 calls/day |
 | Finnhub | 60 calls/min | ~50-100 calls/day |
-| Gemini | 1,500/day | ~10-50 calls/day |
+| OpenAI | Pay per token | ~10-50 calls/day |
 
 ---
 
@@ -182,10 +153,10 @@ Instructions:
 4. Generate new app password for "Mail"
 5. Save the 16-character password as `GMAIL_APP_PASSWORD` secret
 
-### Gemini API Key
-1. Go to https://aistudio.google.com/apikey
+### OpenAI API Key
+1. Go to https://platform.openai.com/api-keys
 2. Create new API key
-3. Save as `GEMINI_API_KEY` secret
+3. Save as `OPENAI_API_KEY` secret
 
 ### Finnhub API Key
 1. Register at https://finnhub.io/register
@@ -204,7 +175,7 @@ Instructions:
 - **API failures**: GitHub Actions sends failure notification (default GitHub behavior)
 - **No email on errors**: Silent failure, retry next day
 - **Missing ticker data**: Skip that ticker, continue with others
-- **Rate limits**: Implement exponential backoff, fail gracefully
+- **Rate limits**: Implement delays between calls, fail gracefully
 
 ---
 
@@ -221,7 +192,7 @@ sentiment_tracker/
 │   ├── price_analyzer.py         # >5% movement detection
 │   ├── earnings_tracker.py       # Earnings calendar logic
 │   ├── news_aggregator.py        # Multi-source news gathering
-│   ├── ai_analyzer.py            # Gemini API integration
+│   ├── ai_analyzer.py            # OpenAI API integration
 │   └── email_sender.py           # Gmail SMTP logic
 ├── requirements.txt              # Python dependencies
 ├── SPEC.md                       # This file
@@ -236,16 +207,7 @@ sentiment_tracker/
 requests>=2.31.0          # HTTP requests
 yfinance>=0.2.36          # Yahoo Finance data
 finnhub-python>=2.4.18    # Finnhub API client
-google-generativeai>=0.4  # Gemini API
+openai>=1.0.0             # OpenAI API
 beautifulsoup4>=4.12      # HTML parsing for news
 python-dateutil>=2.8      # Date handling
 ```
-
----
-
-## Future Enhancements (Out of Scope)
-- Slack/Discord notifications
-- Web dashboard
-- Historical trend analysis
-- Custom threshold per ticker
-- Multiple recipient support

@@ -7,20 +7,19 @@ Automated daily stock monitoring that delivers AI-analyzed insights via email.
 - **Big Movers Alert**: Stocks with >5% daily change, with AI-synthesized explanation
 - **Earnings Calendar**: Reminder 1 day before scheduled earnings calls
 - **Earnings Summaries**: Key insights from recent earnings reports
+- **Full Earnings Calendar**: Table showing next earnings date for all tracked tickers
 
 ## Quick Start
 
-### 1. Create Your Ticker CSV
+### 1. Create Your Ticker List
 
-Export your Google Sheet tab to CSV with these columns:
-- `Ticker` (required): Stock symbol (e.g., AAPL)
-- `Daily Price Change` (required): Percentage as decimal or with % sign
+Create a CSV with your stock tickers. The system reads tickers from column C (index 2).
 
 ### 2. Create a GitHub Gist
 
 1. Go to [gist.github.com](https://gist.github.com)
 2. Create a **secret gist** with your CSV content
-3. Copy the gist URL
+3. Copy the raw gist URL
 
 ### 3. Get API Keys
 
@@ -31,8 +30,8 @@ Export your Google Sheet tab to CSV with these columns:
 4. Generate password for "Mail"
 5. Save the 16-character password
 
-#### Gemini API Key
-1. Go to [Google AI Studio](https://aistudio.google.com/apikey)
+#### OpenAI API Key
+1. Go to [OpenAI Platform](https://platform.openai.com/api-keys)
 2. Create new API key
 
 #### Finnhub API Key
@@ -48,41 +47,32 @@ Export your Google Sheet tab to CSV with these columns:
 
 | Secret Name | Value |
 |-------------|-------|
-| `GIST_URL` | Your gist URL (e.g., `https://gist.github.com/username/abc123`) |
+| `GIST_URL` | Your gist raw URL |
 | `GMAIL_ADDRESS` | Your Gmail address |
 | `GMAIL_APP_PASSWORD` | The 16-character app password |
-| `GEMINI_API_KEY` | Your Gemini API key |
+| `OPENAI_API_KEY` | Your OpenAI API key |
 | `FINNHUB_API_KEY` | Your Finnhub API key |
 
 ### 5. Enable GitHub Actions
 
-The workflow runs automatically at 2 PM Pacific on weekdays.
+The workflow runs automatically at 3 PM Pacific on weekdays.
 
 To test manually:
 1. Go to Actions tab
 2. Select "Daily Stock Report"
 3. Click "Run workflow"
 
-## CSV Format Example
-
-```csv
-Ticker,Daily Price Change,YTD Price Change
-AAPL,-0.02,0.15
-GOOGL,0.07,0.22
-TSLA,-0.08,0.05
-NVDA,0.03,0.45
-```
-
 ## Email Preview
 
 Subject: `[ACTION] TSLA -8%, NVDA earnings tomorrow | Jan 30, 2026`
 
-The email groups all info by ticker:
+The email includes:
 - Price change with direction indicator
 - Extended hours movement (if available)
 - AI analysis of why it moved
 - Upcoming earnings alerts
 - Post-earnings summaries
+- Earnings calendar for all tickers
 
 ## Local Development
 
@@ -91,10 +81,10 @@ The email groups all info by ticker:
 pip install -r requirements.txt
 
 # Set environment variables
-export GIST_URL="https://gist.github.com/..."
+export GIST_URL="https://gist.githubusercontent.com/..."
 export GMAIL_ADDRESS="you@gmail.com"
 export GMAIL_APP_PASSWORD="xxxx xxxx xxxx xxxx"
-export GEMINI_API_KEY="..."
+export OPENAI_API_KEY="sk-..."
 export FINNHUB_API_KEY="..."
 
 # Run
@@ -108,11 +98,11 @@ sentiment_tracker/
 ├── .github/workflows/daily_report.yml
 ├── src/
 │   ├── main.py              # Entry point
-│   ├── data_fetcher.py      # CSV/Gist fetching
+│   ├── data_fetcher.py      # CSV/Gist fetching, Yahoo Finance prices
 │   ├── price_analyzer.py    # >5% movement detection
 │   ├── earnings_tracker.py  # Finnhub earnings calendar
 │   ├── news_aggregator.py   # Multi-source news
-│   ├── ai_analyzer.py       # Gemini AI integration
+│   ├── ai_analyzer.py       # OpenAI gpt-5-mini integration
 │   └── email_sender.py      # Gmail SMTP
 ├── requirements.txt
 ├── SPEC.md                  # Full specification
@@ -127,8 +117,8 @@ sentiment_tracker/
 - Look at GitHub Actions logs for errors
 
 **No analysis appearing?**
-- Check Gemini API key is valid
-- Verify you haven't hit rate limits (1,500/day free)
+- Check OpenAI API key is valid
+- Verify you have API credits available
 
 **Missing earnings data?**
 - Finnhub free tier has rate limits
