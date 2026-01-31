@@ -1,6 +1,6 @@
 import os
 import time
-from google import genai
+from openai import OpenAI
 from src.news_aggregator import NewsItem, format_news_for_prompt
 from src.price_analyzer import PriceMover, format_change
 from src.earnings_tracker import EarningsEvent
@@ -8,16 +8,16 @@ from src.earnings_tracker import EarningsEvent
 # Initialize client globally
 _client = None
 _last_request_time = 0
-MIN_REQUEST_INTERVAL = 4.5  # seconds between requests (safe for 15 RPM limit)
+MIN_REQUEST_INTERVAL = 1.0  # OpenAI has higher rate limits
 
-def get_gemini_client():
-    """Initialize Gemini client."""
+def get_openai_client():
+    """Initialize OpenAI client."""
     global _client
     if _client is None:
-        api_key = os.environ.get("GEMINI_API_KEY")
+        api_key = os.environ.get("OPENAI_API_KEY")
         if not api_key:
-            raise ValueError("GEMINI_API_KEY environment variable not set")
-        _client = genai.Client(api_key=api_key)
+            raise ValueError("OPENAI_API_KEY environment variable not set")
+        _client = OpenAI(api_key=api_key)
     return _client
 
 def rate_limit():
@@ -31,7 +31,7 @@ def rate_limit():
 
 def analyze_price_movement(mover: PriceMover, news_items: list[NewsItem]) -> str:
     """Generate AI analysis of why a stock moved significantly."""
-    client = get_gemini_client()
+    client = get_openai_client()
 
     news_context = format_news_for_prompt(news_items)
     direction = "up" if mover.daily_change > 0 else "down"
@@ -52,18 +52,19 @@ Instructions:
 
     try:
         rate_limit()
-        response = client.models.generate_content(
-            model="gemini-1.5-pro",
-            contents=prompt
+        response = client.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=[{"role": "user", "content": prompt}],
+            max_tokens=200
         )
-        return response.text.strip()
+        return response.choices[0].message.content.strip()
     except Exception as e:
         return f"Analysis unavailable: {str(e)}"
 
 
 def analyze_earnings_report(event: EarningsEvent, news_items: list[NewsItem]) -> str:
     """Generate AI summary of an earnings report."""
-    client = get_gemini_client()
+    client = get_openai_client()
 
     news_context = format_news_for_prompt(news_items)
 
@@ -98,18 +99,19 @@ Instructions:
 
     try:
         rate_limit()
-        response = client.models.generate_content(
-            model="gemini-1.5-pro",
-            contents=prompt
+        response = client.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=[{"role": "user", "content": prompt}],
+            max_tokens=250
         )
-        return response.text.strip()
+        return response.choices[0].message.content.strip()
     except Exception as e:
         return f"Earnings analysis unavailable: {str(e)}"
 
 
 def generate_speculative_context(symbol: str, company_name: str, daily_change: float) -> str:
     """Generate brief speculative analysis when no news is found."""
-    client = get_gemini_client()
+    client = get_openai_client()
 
     direction = "increase" if daily_change > 0 else "decrease"
     change_str = format_change(daily_change)
@@ -126,10 +128,11 @@ Keep response under 60 words. Do not use markdown. Start with "Possible factors:
 
     try:
         rate_limit()
-        response = client.models.generate_content(
-            model="gemini-1.5-pro",
-            contents=prompt
+        response = client.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=[{"role": "user", "content": prompt}],
+            max_tokens=100
         )
-        return response.text.strip()
+        return response.choices[0].message.content.strip()
     except Exception as e:
         return "Unable to generate speculative analysis."
