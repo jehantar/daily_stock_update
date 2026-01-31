@@ -1,7 +1,9 @@
 import os
 import smtplib
+import base64
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
+from email.mime.image import MIMEImage
 from datetime import datetime
 from src.price_analyzer import PriceMover, format_change
 from src.earnings_tracker import EarningsEvent, format_earnings_time
@@ -9,7 +11,7 @@ from src.chart_generator import ChartPair
 
 
 def _generate_fundamentals_section(charts: dict[str, ChartPair]) -> str:
-    """Generate HTML section with fundamental metrics charts."""
+    """Generate HTML section with fundamental metrics charts using CID references."""
     if not charts:
         return ""
 
@@ -17,19 +19,22 @@ def _generate_fundamentals_section(charts: dict[str, ChartPair]) -> str:
 
     for ticker in sorted(charts.keys()):
         chart_pair = charts[ticker]
+        growth_cid = f"growth_{ticker.lower()}"
+        profit_cid = f"profit_{ticker.lower()}"
+
         html_parts.append(f"""
 <div style="margin-bottom: 24px;">
     <h4 style="color: #2563eb; margin-bottom: 8px; margin-top: 16px;">{chart_pair.ticker} - {chart_pair.company_name}</h4>
     <table style="width: 100%; border-collapse: collapse;">
         <tr>
             <td style="width: 50%; padding: 4px; vertical-align: top;">
-                <img src="data:image/png;base64,{chart_pair.growth_chart_base64}"
+                <img src="cid:{growth_cid}"
                      alt="{chart_pair.ticker} Growth Metrics"
                      style="width: 100%; max-width: 350px; height: auto;" />
                 <p style="font-size: 11px; color: #666; margin: 4px 0 0 0;">Growth (QoQ %): Revenue, EPS, FCF</p>
             </td>
             <td style="width: 50%; padding: 4px; vertical-align: top;">
-                <img src="data:image/png;base64,{chart_pair.profitability_chart_base64}"
+                <img src="cid:{profit_cid}"
                      alt="{chart_pair.ticker} Profitability Metrics"
                      style="width: 100%; max-width: 350px; height: auto;" />
                 <p style="font-size: 11px; color: #666; margin: 4px 0 0 0;">Profitability (%): ROE, ROA, Margins</p>
@@ -41,6 +46,28 @@ def _generate_fundamentals_section(charts: dict[str, ChartPair]) -> str:
 """)
 
     return "\n".join(html_parts)
+
+
+def _attach_chart_images(msg: MIMEMultipart, charts: dict[str, ChartPair]) -> None:
+    """Attach chart images with Content-ID headers for inline display."""
+    for ticker in sorted(charts.keys()):
+        chart_pair = charts[ticker]
+
+        # Growth chart
+        growth_cid = f"growth_{ticker.lower()}"
+        growth_data = base64.b64decode(chart_pair.growth_chart_base64)
+        growth_img = MIMEImage(growth_data, _subtype='png')
+        growth_img.add_header('Content-ID', f'<{growth_cid}>')
+        growth_img.add_header('Content-Disposition', 'inline', filename=f'{ticker}_growth.png')
+        msg.attach(growth_img)
+
+        # Profitability chart
+        profit_cid = f"profit_{ticker.lower()}"
+        profit_data = base64.b64decode(chart_pair.profitability_chart_base64)
+        profit_img = MIMEImage(profit_data, _subtype='png')
+        profit_img.add_header('Content-ID', f'<{profit_cid}>')
+        profit_img.add_header('Content-Disposition', 'inline', filename=f'{ticker}_profitability.png')
+        msg.attach(profit_img)
 
 
 def send_daily_report(
@@ -66,12 +93,26 @@ def send_daily_report(
     subject = generate_subject(movers, upcoming_earnings, recent_earnings)
     html_body = generate_html_body(movers, upcoming_earnings, recent_earnings, all_earnings, fundamental_charts)
 
-    msg = MIMEMultipart("alternative")
-    msg["Subject"] = subject
-    msg["From"] = gmail_address
-    msg["To"] = gmail_address
+    # Use "related" for HTML with embedded images, otherwise "alternative"
+    if fundamental_charts:
+        msg = MIMEMultipart("related")
+        msg["Subject"] = subject
+        msg["From"] = gmail_address
+        msg["To"] = gmail_address
 
-    msg.attach(MIMEText(html_body, "html"))
+        # HTML goes in a nested alternative part
+        msg_alt = MIMEMultipart("alternative")
+        msg_alt.attach(MIMEText(html_body, "html"))
+        msg.attach(msg_alt)
+
+        # Attach chart images with CID references
+        _attach_chart_images(msg, fundamental_charts)
+    else:
+        msg = MIMEMultipart("alternative")
+        msg["Subject"] = subject
+        msg["From"] = gmail_address
+        msg["To"] = gmail_address
+        msg.attach(MIMEText(html_body, "html"))
 
     try:
         with smtplib.SMTP_SSL("smtp.gmail.com", 465) as server:
