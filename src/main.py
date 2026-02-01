@@ -56,9 +56,9 @@ def main():
     print(f"Starting Sentiment Tracker - {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
 
     # Check for market holidays
-    # if is_market_holiday():
-    #     print("Market holiday detected. Skipping report.")
-    #     return 0
+    if is_market_holiday():
+        print("Market holiday detected. Skipping report.")
+        return 0
 
     # Step 1: Fetch ticker symbols from Gist
     print("Fetching tickers from Gist...")
