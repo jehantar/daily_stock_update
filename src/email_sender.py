@@ -64,42 +64,59 @@ def _generate_portfolio_summary(tickers: list[Ticker]) -> str:
 """
 
 
-def _generate_valuation_table(movers: list[tuple[PriceMover, str]], tickers: list[Ticker]) -> str:
-    """Generate valuation snapshot table for movers."""
-    if not movers:
+def _generate_valuation_table(tickers: list[Ticker]) -> str:
+    """Generate valuation snapshot table for all stocks, grouped by sector."""
+    if not tickers:
         return ""
 
-    # Build lookup from symbol to Ticker for valuation data
-    ticker_lookup = {t.symbol: t for t in tickers}
+    # Group tickers by sector
+    from collections import defaultdict
+    sectors: dict[str, list[Ticker]] = defaultdict(list)
+    for t in tickers:
+        sector = t.sector or "Other"
+        sectors[sector].append(t)
+
+    # Sort sectors alphabetically, but put "Other" at the end
+    sorted_sectors = sorted(s for s in sectors.keys() if s != "Other")
+    if "Other" in sectors:
+        sorted_sectors.append("Other")
 
     rows = []
-    for mover, _ in movers:
-        t = ticker_lookup.get(mover.symbol)
-        if not t:
-            continue
+    for sector in sorted_sectors:
+        sector_tickers = sectors[sector]
+        # Sort tickers within sector by industry, then by symbol
+        sector_tickers.sort(key=lambda t: (t.industry or "", t.symbol))
 
-        pe_str = f"{t.trailing_pe:.1f}" if t.trailing_pe else "-"
-        fwd_pe_str = f"{t.forward_pe:.1f}" if t.forward_pe else "-"
-        yield_str = f"{t.dividend_yield * 100:.1f}%" if t.dividend_yield else "-"
-        cap_str = _format_market_cap(t.market_cap)
-
+        # Sector header row
         rows.append(f"""
+<tr style="background: #e2e8f0;">
+    <td colspan="6" style="padding: 8px; font-weight: bold; color: #475569;">{sector}</td>
+</tr>""")
+
+        for t in sector_tickers:
+            change_str = format_change(t.daily_change)
+            change_color = "#16a34a" if t.daily_change > 0 else "#dc2626" if t.daily_change < 0 else "#666"
+            pe_str = f"{t.trailing_pe:.1f}" if t.trailing_pe else "-"
+            fwd_pe_str = f"{t.forward_pe:.1f}" if t.forward_pe else "-"
+            yield_str = f"{t.dividend_yield * 100:.1f}%" if t.dividend_yield else "-"
+            cap_str = _format_market_cap(t.market_cap)
+
+            rows.append(f"""
 <tr style="border-bottom: 1px solid #eee;">
-    <td style="padding: 6px 8px;"><strong>{mover.symbol}</strong></td>
+    <td style="padding: 6px 8px;"><strong>{t.symbol}</strong></td>
+    <td style="padding: 6px 8px; text-align: right; color: {change_color};">{change_str}</td>
     <td style="padding: 6px 8px; text-align: right;">{pe_str}</td>
     <td style="padding: 6px 8px; text-align: right;">{fwd_pe_str}</td>
     <td style="padding: 6px 8px; text-align: right;">{yield_str}</td>
     <td style="padding: 6px 8px; text-align: right;">{cap_str}</td>
 </tr>""")
 
-    if not rows:
-        return ""
-
     return f"""
 <h3>Valuation Snapshot</h3>
 <table style="width: 100%; border-collapse: collapse; font-size: 14px;">
 <tr style="background: #f5f5f5; text-align: left;">
     <th style="padding: 8px; border-bottom: 1px solid #ddd;">Ticker</th>
+    <th style="padding: 8px; border-bottom: 1px solid #ddd; text-align: right;">Daily</th>
     <th style="padding: 8px; border-bottom: 1px solid #ddd; text-align: right;">P/E</th>
     <th style="padding: 8px; border-bottom: 1px solid #ddd; text-align: right;">Fwd P/E</th>
     <th style="padding: 8px; border-bottom: 1px solid #ddd; text-align: right;">Yield</th>
@@ -309,9 +326,9 @@ def generate_html_body(
 <hr>
 """)
 
-    # Valuation Snapshot Table (after movers)
-    if movers and tickers:
-        sections.append(_generate_valuation_table(movers, tickers))
+    # Valuation Snapshot Table (all stocks, grouped by sector)
+    if tickers:
+        sections.append(_generate_valuation_table(tickers))
 
     # Upcoming Earnings Section
     for event in upcoming_earnings:

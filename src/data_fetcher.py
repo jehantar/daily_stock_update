@@ -17,6 +17,8 @@ class Ticker:
     forward_pe: float | None = None
     dividend_yield: float | None = None
     market_cap: int | None = None
+    sector: str | None = None
+    industry: str | None = None
 
 
 def fetch_tickers_from_gist() -> list[str]:
@@ -104,6 +106,8 @@ def fetch_price_data(symbols: list[str]) -> list[Ticker]:
             forward_pe = info.get("forwardPE")
             dividend_yield = info.get("dividendYield")
             market_cap = info.get("marketCap")
+            sector = info.get("sector")
+            industry = info.get("industry")
 
             tickers.append(Ticker(
                 symbol=symbol,
@@ -116,6 +120,8 @@ def fetch_price_data(symbols: list[str]) -> list[Ticker]:
                 forward_pe=forward_pe,
                 dividend_yield=dividend_yield,
                 market_cap=market_cap,
+                sector=sector,
+                industry=industry,
             ))
             print(f"  {symbol}: {daily_change*100:+.1f}%")
 
