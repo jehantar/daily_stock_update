@@ -5,9 +5,110 @@ from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from email.mime.image import MIMEImage
 from datetime import datetime
+from src.data_fetcher import Ticker
 from src.price_analyzer import PriceMover, format_change
 from src.earnings_tracker import EarningsEvent, format_earnings_time
 from src.chart_generator import ChartPair
+
+
+def _format_market_cap(market_cap: int | None) -> str:
+    """Format market cap as human-readable string (e.g., $1.2T, $580B, $45M)."""
+    if market_cap is None:
+        return "-"
+    if market_cap >= 1e12:
+        return f"${market_cap / 1e12:.1f}T"
+    elif market_cap >= 1e9:
+        return f"${market_cap / 1e9:.0f}B"
+    elif market_cap >= 1e6:
+        return f"${market_cap / 1e6:.0f}M"
+    else:
+        return f"${market_cap:,.0f}"
+
+
+def _generate_portfolio_summary(tickers: list[Ticker]) -> str:
+    """Generate portfolio summary header with key stats."""
+    if not tickers:
+        return ""
+
+    total = len(tickers)
+    gainers = sum(1 for t in tickers if t.daily_change > 0)
+    losers = sum(1 for t in tickers if t.daily_change < 0)
+    unchanged = total - gainers - losers
+
+    avg_change = sum(t.daily_change for t in tickers) / total if total > 0 else 0
+
+    # Find top gainer and loser
+    sorted_by_change = sorted(tickers, key=lambda t: t.daily_change, reverse=True)
+    top_gainer = sorted_by_change[0] if sorted_by_change else None
+    top_loser = sorted_by_change[-1] if sorted_by_change else None
+
+    top_line = []
+    if top_gainer and top_gainer.daily_change > 0:
+        top_line.append(f"Top: {top_gainer.symbol} {format_change(top_gainer.daily_change)}")
+    if top_loser and top_loser.daily_change < 0:
+        top_line.append(f"Bottom: {top_loser.symbol} {format_change(top_loser.daily_change)}")
+
+    top_str = " | ".join(top_line) if top_line else ""
+
+    return f"""
+<div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 12px 16px; margin-bottom: 20px;">
+    <p style="margin: 0 0 4px 0; font-size: 14px; color: #64748b;">Portfolio Summary</p>
+    <p style="margin: 0; font-size: 15px;">
+        <strong>{total} stocks</strong> |
+        <span style="color: #16a34a;">{gainers} up</span>,
+        <span style="color: #dc2626;">{losers} down</span>{f", {unchanged} flat" if unchanged else ""} |
+        Avg: <strong>{format_change(avg_change)}</strong>
+    </p>
+    {f'<p style="margin: 4px 0 0 0; font-size: 13px; color: #475569;">{top_str}</p>' if top_str else ""}
+</div>
+"""
+
+
+def _generate_valuation_table(movers: list[tuple[PriceMover, str]], tickers: list[Ticker]) -> str:
+    """Generate valuation snapshot table for movers."""
+    if not movers:
+        return ""
+
+    # Build lookup from symbol to Ticker for valuation data
+    ticker_lookup = {t.symbol: t for t in tickers}
+
+    rows = []
+    for mover, _ in movers:
+        t = ticker_lookup.get(mover.symbol)
+        if not t:
+            continue
+
+        pe_str = f"{t.trailing_pe:.1f}" if t.trailing_pe else "-"
+        fwd_pe_str = f"{t.forward_pe:.1f}" if t.forward_pe else "-"
+        yield_str = f"{t.dividend_yield * 100:.1f}%" if t.dividend_yield else "-"
+        cap_str = _format_market_cap(t.market_cap)
+
+        rows.append(f"""
+<tr style="border-bottom: 1px solid #eee;">
+    <td style="padding: 6px 8px;"><strong>{mover.symbol}</strong></td>
+    <td style="padding: 6px 8px; text-align: right;">{pe_str}</td>
+    <td style="padding: 6px 8px; text-align: right;">{fwd_pe_str}</td>
+    <td style="padding: 6px 8px; text-align: right;">{yield_str}</td>
+    <td style="padding: 6px 8px; text-align: right;">{cap_str}</td>
+</tr>""")
+
+    if not rows:
+        return ""
+
+    return f"""
+<h3>Valuation Snapshot</h3>
+<table style="width: 100%; border-collapse: collapse; font-size: 14px;">
+<tr style="background: #f5f5f5; text-align: left;">
+    <th style="padding: 8px; border-bottom: 1px solid #ddd;">Ticker</th>
+    <th style="padding: 8px; border-bottom: 1px solid #ddd; text-align: right;">P/E</th>
+    <th style="padding: 8px; border-bottom: 1px solid #ddd; text-align: right;">Fwd P/E</th>
+    <th style="padding: 8px; border-bottom: 1px solid #ddd; text-align: right;">Yield</th>
+    <th style="padding: 8px; border-bottom: 1px solid #ddd; text-align: right;">Mkt Cap</th>
+</tr>
+{"".join(rows)}
+</table>
+<hr>
+"""
 
 
 def _generate_fundamentals_section(charts: dict[str, ChartPair]) -> str:
@@ -76,6 +177,7 @@ def send_daily_report(
     recent_earnings: list[tuple[EarningsEvent, str]],  # (event, summary)
     all_earnings: dict[str, EarningsEvent | None] = None,  # Full earnings calendar
     fundamental_charts: dict[str, ChartPair] = None,  # Fundamental metrics charts
+    tickers: list[Ticker] = None,  # All tickers for portfolio summary
 ) -> bool:
     """Send the daily report email. Returns True if sent successfully."""
 
@@ -91,7 +193,7 @@ def send_daily_report(
         raise ValueError("Gmail credentials not set in environment")
 
     subject = generate_subject(movers, upcoming_earnings, recent_earnings)
-    html_body = generate_html_body(movers, upcoming_earnings, recent_earnings, all_earnings, fundamental_charts)
+    html_body = generate_html_body(movers, upcoming_earnings, recent_earnings, all_earnings, fundamental_charts, tickers)
 
     # Use "related" for HTML with embedded images, otherwise "alternative"
     if fundamental_charts:
@@ -160,13 +262,24 @@ def generate_html_body(
     recent_earnings: list[tuple[EarningsEvent, str]],
     all_earnings: dict[str, EarningsEvent | None] = None,
     fundamental_charts: dict[str, ChartPair] = None,
+    tickers: list[Ticker] = None,
 ) -> str:
     """Generate minimal HTML email body."""
     today = datetime.now().strftime("%B %d, %Y")
 
     sections = [f"<h2>Daily Stock Report - {today}</h2>"]
 
+    # Portfolio Summary (at top)
+    if tickers:
+        sections.append(_generate_portfolio_summary(tickers))
+
+    # Build ticker lookup for 52-week context
+    ticker_lookup = {t.symbol: t for t in tickers} if tickers else {}
+
     # Big Movers Section
+    if movers:
+        sections.append("<h3>Big Movers (>5%)</h3>")
+
     for mover, analysis in movers:
         change = format_change(mover.daily_change)
         color = "#16a34a" if mover.daily_change > 0 else "#dc2626"
@@ -177,12 +290,28 @@ def generate_html_body(
             ext_change = format_change(mover.extended_hours_change)
             extended_note = f" (Extended hours: {ext_change})"
 
+        # 52-week context
+        week_52_note = ""
+        t = ticker_lookup.get(mover.symbol)
+        if t and t.current_price and t.fifty_two_week_high and t.fifty_two_week_low:
+            if t.current_price < t.fifty_two_week_high:
+                pct_below = (t.fifty_two_week_high - t.current_price) / t.fifty_two_week_high
+                week_52_note = f'<p style="color: #64748b; font-size: 13px; margin: 4px 0;">{pct_below*100:.0f}% below 52-week high (${t.fifty_two_week_high:.2f})</p>'
+            elif t.current_price > t.fifty_two_week_low:
+                pct_above = (t.current_price - t.fifty_two_week_low) / t.fifty_two_week_low
+                if pct_above < 0.1:  # Near 52-week low
+                    week_52_note = f'<p style="color: #64748b; font-size: 13px; margin: 4px 0;">Near 52-week low (${t.fifty_two_week_low:.2f})</p>'
+
         sections.append(f"""
-<h3>{mover.symbol} - {mover.company_name}</h3>
+<h4 style="color: #2563eb; margin-bottom: 4px;">{mover.symbol} - {mover.company_name}</h4>
 <p><strong style="color: {color};">{arrow} {change}</strong>{extended_note}</p>
-<p><strong>Why it moved:</strong> {analysis}</p>
+{week_52_note}<p><strong>Why it moved:</strong> {analysis}</p>
 <hr>
 """)
+
+    # Valuation Snapshot Table (after movers)
+    if movers and tickers:
+        sections.append(_generate_valuation_table(movers, tickers))
 
     # Upcoming Earnings Section
     for event in upcoming_earnings:

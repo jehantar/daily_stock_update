@@ -9,6 +9,14 @@ class Ticker:
     symbol: str
     daily_change: float  # As decimal (e.g., -0.05 for -5%)
     company_name: str = ""
+    # Valuation and context fields
+    current_price: float | None = None
+    fifty_two_week_high: float | None = None
+    fifty_two_week_low: float | None = None
+    trailing_pe: float | None = None
+    forward_pe: float | None = None
+    dividend_yield: float | None = None
+    market_cap: int | None = None
 
 
 def fetch_tickers_from_gist() -> list[str]:
@@ -89,10 +97,25 @@ def fetch_price_data(symbols: list[str]) -> list[Ticker]:
 
             company_name = info.get("shortName") or info.get("longName") or symbol
 
+            # Valuation and context fields
+            fifty_two_week_high = info.get("fiftyTwoWeekHigh")
+            fifty_two_week_low = info.get("fiftyTwoWeekLow")
+            trailing_pe = info.get("trailingPE")
+            forward_pe = info.get("forwardPE")
+            dividend_yield = info.get("dividendYield")
+            market_cap = info.get("marketCap")
+
             tickers.append(Ticker(
                 symbol=symbol,
                 daily_change=daily_change,
-                company_name=company_name
+                company_name=company_name,
+                current_price=current_price,
+                fifty_two_week_high=fifty_two_week_high,
+                fifty_two_week_low=fifty_two_week_low,
+                trailing_pe=trailing_pe,
+                forward_pe=forward_pe,
+                dividend_yield=dividend_yield,
+                market_cap=market_cap,
             ))
             print(f"  {symbol}: {daily_change*100:+.1f}%")
 

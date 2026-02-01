@@ -134,6 +134,7 @@ def main():
             recent_earnings=analyzed_earnings,
             all_earnings=all_earnings,
             fundamental_charts=fundamental_charts,
+            tickers=tickers,
         )
         if sent:
             print("Report sent successfully!")
