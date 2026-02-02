@@ -64,33 +64,83 @@ def _generate_portfolio_summary(tickers: list[Ticker]) -> str:
 """
 
 
+def _get_custom_category(symbol: str) -> str:
+    """Map ticker symbol to custom category."""
+    CATEGORIES = {
+        # Platform Technology & Digital Ecosystems
+        "META": "Platform Technology & Digital Ecosystems",
+        "GOOGL": "Platform Technology & Digital Ecosystems",
+        "GOOG": "Platform Technology & Digital Ecosystems",
+        "MSFT": "Platform Technology & Digital Ecosystems",
+        "AMZN": "Platform Technology & Digital Ecosystems",
+        "NFLX": "Platform Technology & Digital Ecosystems",
+        # Semiconductors, Hardware & Digital Infrastructure
+        "NVDA": "Semiconductors, Hardware & Digital Infrastructure",
+        "AVGO": "Semiconductors, Hardware & Digital Infrastructure",
+        "TSM": "Semiconductors, Hardware & Digital Infrastructure",
+        "MU": "Semiconductors, Hardware & Digital Infrastructure",
+        "WDC": "Semiconductors, Hardware & Digital Infrastructure",
+        "CLS": "Semiconductors, Hardware & Digital Infrastructure",
+        # Enterprise, Security & GovTech Software
+        "CRWD": "Enterprise, Security & GovTech Software",
+        "NET": "Enterprise, Security & GovTech Software",
+        "AXON": "Enterprise, Security & GovTech Software",
+        "APP": "Enterprise, Security & GovTech Software",
+        # Commerce, Marketplaces & Consumer Logistics
+        "MELI": "Commerce, Marketplaces & Consumer Logistics",
+        "UBER": "Commerce, Marketplaces & Consumer Logistics",
+        "WMT": "Commerce, Marketplaces & Consumer Logistics",
+        "BABA": "Commerce, Marketplaces & Consumer Logistics",
+        # Financials & Assets
+        "AMG": "Financials & Assets",
+        "B": "Financials & Assets",
+        # Resources, Materials & Life Sciences
+        "EQX": "Resources, Materials & Life Sciences",
+        "HL": "Resources, Materials & Life Sciences",
+        "NGD": "Resources, Materials & Life Sciences",
+        "KRYS": "Resources, Materials & Life Sciences",
+        "MEDP": "Resources, Materials & Life Sciences",
+    }
+    return CATEGORIES.get(symbol.upper(), "Other")
+
+
+# Category display order
+CATEGORY_ORDER = [
+    "Platform Technology & Digital Ecosystems",
+    "Semiconductors, Hardware & Digital Infrastructure",
+    "Enterprise, Security & GovTech Software",
+    "Commerce, Marketplaces & Consumer Logistics",
+    "Financials & Assets",
+    "Resources, Materials & Life Sciences",
+    "Other",
+]
+
+
 def _generate_valuation_table(tickers: list[Ticker]) -> str:
-    """Generate valuation snapshot table for all stocks, grouped by sector."""
+    """Generate valuation snapshot table for all stocks, grouped by custom categories."""
     if not tickers:
         return ""
 
-    # Group tickers by sector
+    # Group tickers by custom category
     from collections import defaultdict
-    sectors: dict[str, list[Ticker]] = defaultdict(list)
+    categories: dict[str, list[Ticker]] = defaultdict(list)
     for t in tickers:
-        sector = t.sector or "Other"
-        sectors[sector].append(t)
+        category = _get_custom_category(t.symbol)
+        categories[category].append(t)
 
-    # Sort sectors alphabetically, but put "Other" at the end
-    sorted_sectors = sorted(s for s in sectors.keys() if s != "Other")
-    if "Other" in sectors:
-        sorted_sectors.append("Other")
+    # Use predefined category order
+    sorted_categories = [c for c in CATEGORY_ORDER if c in categories]
 
     rows = []
-    for sector in sorted_sectors:
-        sector_tickers = sectors[sector]
-        # Sort tickers within sector by industry, then by symbol
-        sector_tickers.sort(key=lambda t: (t.industry or "", t.symbol))
+    for category in sorted_categories:
+        category_tickers = categories[category]
+        # Sort tickers within category alphabetically
+        category_tickers.sort(key=lambda t: t.symbol)
 
-        # Sector header row
+        # Category header row
         rows.append(f"""
 <tr style="background: #e2e8f0;">
-    <td colspan="6" style="padding: 8px; font-weight: bold; color: #475569;">{sector}</td>
+    <td colspan="6" style="padding: 8px; font-weight: bold; color: #475569;">{category}</td>
 </tr>""")
 
         for t in sector_tickers:

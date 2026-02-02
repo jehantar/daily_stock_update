@@ -2,9 +2,11 @@ name: Daily Stock Report
 
 on:
   schedule:
-    # Run at 11 PM UTC (3 PM Pacific) on weekdays
+    # Run at 11 PM UTC (3 PM Pacific) on weekdays - backup trigger
     - cron: '0 23 * * 1-5'
   workflow_dispatch: # Allow manual trigger
+  repository_dispatch: # Allow external trigger via API
+    types: [daily-report]
 
 jobs:
   generate-report:
