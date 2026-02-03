@@ -15,6 +15,7 @@ class Ticker:
     fifty_two_week_low: float | None = None
     trailing_pe: float | None = None
     forward_pe: float | None = None
+    price_to_cash_flow: float | None = None
     dividend_yield: float | None = None
     market_cap: int | None = None
     sector: str | None = None
@@ -104,6 +105,7 @@ def fetch_price_data(symbols: list[str]) -> list[Ticker]:
             fifty_two_week_low = info.get("fiftyTwoWeekLow")
             trailing_pe = info.get("trailingPE")
             forward_pe = info.get("forwardPE")
+            price_to_cash_flow = info.get("priceToOperatingCashFlows")
             dividend_yield = info.get("dividendYield")
             market_cap = info.get("marketCap")
             sector = info.get("sector")
@@ -118,6 +120,7 @@ def fetch_price_data(symbols: list[str]) -> list[Ticker]:
                 fifty_two_week_low=fifty_two_week_low,
                 trailing_pe=trailing_pe,
                 forward_pe=forward_pe,
+                price_to_cash_flow=price_to_cash_flow,
                 dividend_yield=dividend_yield,
                 market_cap=market_cap,
                 sector=sector,

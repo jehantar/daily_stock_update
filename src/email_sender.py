@@ -166,8 +166,8 @@ def _get_custom_category(symbol: str) -> str:
         "BABA": "Commerce, Marketplaces & Consumer Logistics",
         # Financials & Assets
         "AMG": "Financials & Assets",
-        "B": "Financials & Assets",
         # Resources, Materials & Life Sciences
+        "B": "Resources, Materials & Life Sciences",
         "EQX": "Resources, Materials & Life Sciences",
         "HL": "Resources, Materials & Life Sciences",
         "NGD": "Resources, Materials & Life Sciences",
@@ -213,7 +213,7 @@ def _generate_valuation_table(tickers: list[Ticker]) -> str:
         # Category header row
         rows.append(f"""
 <tr style="background: #e2e8f0;">
-    <td colspan="6" style="padding: 8px; font-weight: bold; color: #475569;">{category}</td>
+    <td colspan="7" style="padding: 8px; font-weight: bold; color: #475569;">{category}</td>
 </tr>""")
 
         for t in category_tickers:
@@ -221,6 +221,7 @@ def _generate_valuation_table(tickers: list[Ticker]) -> str:
             change_color = "#16a34a" if t.daily_change > 0 else "#dc2626" if t.daily_change < 0 else "#666"
             pe_str = f"{t.trailing_pe:.1f}" if t.trailing_pe else "-"
             fwd_pe_str = f"{t.forward_pe:.1f}" if t.forward_pe else "-"
+            pcf_str = f"{t.price_to_cash_flow:.1f}" if t.price_to_cash_flow else "-"
             yield_str = f"{t.dividend_yield:.2f}%" if t.dividend_yield else "-"
             cap_str = _format_market_cap(t.market_cap)
 
@@ -230,6 +231,7 @@ def _generate_valuation_table(tickers: list[Ticker]) -> str:
     <td style="padding: 6px 8px; text-align: right; color: {change_color};">{change_str}</td>
     <td style="padding: 6px 8px; text-align: right;">{pe_str}</td>
     <td style="padding: 6px 8px; text-align: right;">{fwd_pe_str}</td>
+    <td style="padding: 6px 8px; text-align: right;">{pcf_str}</td>
     <td style="padding: 6px 8px; text-align: right;">{yield_str}</td>
     <td style="padding: 6px 8px; text-align: right;">{cap_str}</td>
 </tr>""")
@@ -242,6 +244,7 @@ def _generate_valuation_table(tickers: list[Ticker]) -> str:
     <th style="padding: 8px; border-bottom: 1px solid #ddd; text-align: right;">Daily</th>
     <th style="padding: 8px; border-bottom: 1px solid #ddd; text-align: right;">P/E</th>
     <th style="padding: 8px; border-bottom: 1px solid #ddd; text-align: right;">Fwd P/E</th>
+    <th style="padding: 8px; border-bottom: 1px solid #ddd; text-align: right;">P/CF</th>
     <th style="padding: 8px; border-bottom: 1px solid #ddd; text-align: right;">Yield</th>
     <th style="padding: 8px; border-bottom: 1px solid #ddd; text-align: right;">Mkt Cap</th>
 </tr>
