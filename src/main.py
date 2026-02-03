@@ -19,7 +19,7 @@ from datetime import datetime
 from src.data_fetcher import fetch_tickers_from_gist, fetch_price_data
 from src.price_analyzer import identify_movers
 from src.earnings_tracker import get_upcoming_earnings, get_recent_earnings, get_earnings_calendar
-from src.news_aggregator import aggregate_news
+from src.news_aggregator import aggregate_news, aggregate_earnings_context
 from src.ai_analyzer import analyze_price_movement, analyze_earnings_report
 from src.email_sender import send_daily_report
 from src.fundamentals_fetcher import fetch_fundamentals
@@ -120,12 +120,15 @@ def main():
         analyzed_movers.append((mover, analysis))
         print(f"  {mover.symbol}: analyzed")
 
-    # Step 7: Generate AI summaries for recent earnings
+    # Step 7: Generate AI summaries for recent earnings (with earnings call context)
     print("Generating earnings summaries...")
     analyzed_earnings = []
     for event in recent_earnings:
-        news = aggregate_news(event.symbol, event.company_name)
-        summary = analyze_earnings_report(event, news)
+        print(f"  {event.symbol}: fetching earnings call coverage...")
+        news, earnings_contexts = aggregate_earnings_context(event.symbol, event.company_name)
+        if earnings_contexts:
+            print(f"  {event.symbol}: found {len(earnings_contexts)} earnings call sources")
+        summary = analyze_earnings_report(event, news, earnings_contexts)
         analyzed_earnings.append((event, summary))
         print(f"  {event.symbol}: summarized")
 

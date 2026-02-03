@@ -1,7 +1,12 @@
 import os
 import time
 from openai import OpenAI
-from src.news_aggregator import NewsItem, format_news_for_prompt
+from src.news_aggregator import (
+    NewsItem,
+    EarningsCallContext,
+    format_news_for_prompt,
+    format_earnings_context_for_prompt,
+)
 from src.price_analyzer import PriceMover, format_change
 from src.earnings_tracker import EarningsEvent
 
@@ -64,11 +69,26 @@ Instructions:
         return f"Analysis unavailable: {str(e)}"
 
 
-def analyze_earnings_report(event: EarningsEvent, news_items: list[NewsItem]) -> str:
-    """Generate comprehensive AI summary of an earnings report."""
+def analyze_earnings_report(
+    event: EarningsEvent,
+    news_items: list[NewsItem],
+    earnings_contexts: list[EarningsCallContext] | None = None
+) -> str:
+    """
+    Generate comprehensive AI summary of an earnings report.
+
+    Args:
+        event: The earnings event data
+        news_items: Recent news articles
+        earnings_contexts: Optional additional context from earnings call coverage
+    """
     client = get_openai_client()
 
-    news_context = format_news_for_prompt(news_items)
+    # Use enhanced context if available, otherwise just news
+    if earnings_contexts:
+        full_context = format_earnings_context_for_prompt(news_items, earnings_contexts)
+    else:
+        full_context = format_news_for_prompt(news_items)
 
     eps_info = ""
     if event.eps_estimate and event.actual_eps:
@@ -90,8 +110,7 @@ Earnings date: {event.date.strftime('%B %d, %Y')}
 {eps_info}
 {revenue_info}
 
-Recent news and analyst coverage:
-{news_context}
+{full_context}
 
 Provide your analysis in this exact format:
 
@@ -107,9 +126,13 @@ ANALYST REACTIONS:
 FORWARD OUTLOOK:
 - [Management guidance, growth expectations, key metrics to watch]
 
+KEY QUOTES:
+- [1-2 notable quotes from CEO/CFO on the earnings call, if available in the coverage]
+
 Instructions:
 - Be specific with numbers and percentages where available
-- If information is not available in the news, write "Not available in current coverage"
+- Include direct quotes from executives when found in the coverage
+- If information is not available, write "Not available in current coverage"
 - Focus on what investors care about most
 - Do not use markdown formatting beyond the section headers above
 - Write in a professional, concise style"""

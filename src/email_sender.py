@@ -36,6 +36,7 @@ def _format_earnings_summary(summary: str) -> str:
         "LOWLIGHTS": {"icon": "📉", "color": "#dc2626", "bg": "#fef2f2"},
         "ANALYST REACTIONS": {"icon": "🎯", "color": "#7c3aed", "bg": "#f5f3ff"},
         "FORWARD OUTLOOK": {"icon": "🔮", "color": "#0369a1", "bg": "#f0f9ff"},
+        "KEY QUOTES": {"icon": "💬", "color": "#ca8a04", "bg": "#fefce8"},
     }
 
     html_parts = []
