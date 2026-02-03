@@ -26,12 +26,14 @@ COLORS = {
     "revenue": "#3b82f6",  # Blue
     "eps": "#16a34a",      # Green (matches existing up color)
     "fcf": "#f59e0b",      # Amber
+    "ebitda": "#ef4444",   # Red
 
     # Profitability chart colors
     "roe": "#8b5cf6",      # Purple
     "roa": "#06b6d4",      # Cyan
     "gross_margin": "#14b8a6",  # Teal
     "net_margin": "#ec4899",    # Pink
+    "operating_margin": "#f97316",  # Orange
 
     # Chart elements
     "grid": "#e5e5e5",
@@ -222,19 +224,21 @@ def _create_line_chart(
 
 
 def _create_growth_chart(data: FundamentalData) -> str:
-    """Create growth metrics line chart (Revenue, EPS, FCF growth %)."""
+    """Create growth metrics line chart (Revenue, EPS, FCF, EBITDA growth %)."""
     quarter_labels = [_format_quarter(q) for q in data.quarters]
 
     metrics = {
         "revenue": data.revenue_growth,
         "eps": data.eps_growth,
         "fcf": data.fcf_growth,
+        "ebitda": data.ebitda_growth,
     }
 
     colors = {
         "revenue": COLORS["revenue"],
         "eps": COLORS["eps"],
         "fcf": COLORS["fcf"],
+        "ebitda": COLORS["ebitda"],
     }
 
     fig = _create_line_chart(
@@ -250,13 +254,14 @@ def _create_growth_chart(data: FundamentalData) -> str:
 
 
 def _create_profitability_chart(data: FundamentalData) -> str:
-    """Create profitability metrics line chart (ROE, ROA, Gross Margin, Net Margin)."""
+    """Create profitability metrics line chart (ROE, ROA, margins)."""
     quarter_labels = [_format_quarter(q) for q in data.quarters]
 
     metrics = {
         "roe": data.roe,
         "roa": data.roa,
         "gross_margin": data.gross_margin,
+        "operating_margin": data.operating_margin,
         "net_margin": data.net_margin,
     }
 
@@ -264,6 +269,7 @@ def _create_profitability_chart(data: FundamentalData) -> str:
         "roe": COLORS["roe"],
         "roa": COLORS["roa"],
         "gross_margin": COLORS["gross_margin"],
+        "operating_margin": COLORS["operating_margin"],
         "net_margin": COLORS["net_margin"],
     }
 

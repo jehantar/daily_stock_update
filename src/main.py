@@ -85,27 +85,31 @@ def main():
     movers = identify_movers(tickers, threshold=0.05)
     print(f"Found {len(movers)} stocks with >5% movement")
 
-    # Step 4: Fetch fundamental data and generate charts
-    print("Fetching fundamental data from Nasdaq Data Link...")
-    fundamental_charts = {}
-    try:
-        fundamentals = fetch_fundamentals(symbols, company_names, quarters=6)
-        print(f"  Retrieved fundamentals for {len(fundamentals)} tickers")
-
-        print("Generating fundamental charts...")
-        fundamental_charts = generate_all_charts(fundamentals)
-        print(f"  Generated {len(fundamental_charts)} chart pairs")
-    except Exception as e:
-        print(f"  Warning: Failed to fetch/generate fundamentals: {e}")
-        print("  Continuing without fundamentals section...")
-
-    # Step 5: Check earnings calendar
+    # Step 4: Check earnings calendar (moved up to filter fundamentals)
     print("Checking earnings calendar...")
     all_earnings = get_earnings_calendar(symbols)
     upcoming_earnings = get_upcoming_earnings(symbols, days_ahead=1)
     recent_earnings = get_recent_earnings(symbols, days_back=1)
     earnings_with_dates = sum(1 for e in all_earnings.values() if e and e.is_upcoming)
     print(f"Upcoming earnings: {len(upcoming_earnings)}, Recent reports: {len(recent_earnings)}, Scheduled: {earnings_with_dates}")
+
+    # Step 5: Fetch fundamental data and generate charts (only for recent earnings)
+    fundamental_charts = {}
+    if recent_earnings:
+        recent_symbols = [e.symbol for e in recent_earnings]
+        print(f"Fetching fundamental data for {len(recent_symbols)} tickers with recent earnings...")
+        try:
+            fundamentals = fetch_fundamentals(recent_symbols, company_names, quarters=6)
+            print(f"  Retrieved fundamentals for {len(fundamentals)} tickers")
+
+            print("Generating fundamental charts...")
+            fundamental_charts = generate_all_charts(fundamentals)
+            print(f"  Generated {len(fundamental_charts)} chart pairs")
+        except Exception as e:
+            print(f"  Warning: Failed to fetch/generate fundamentals: {e}")
+            print("  Continuing without fundamentals section...")
+    else:
+        print("No recent earnings - skipping fundamental charts")
 
     # Step 6: Generate AI analysis for movers
     print("Generating analysis for movers...")

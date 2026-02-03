@@ -25,6 +25,78 @@ def _format_market_cap(market_cap: int | None) -> str:
         return f"${market_cap:,.0f}"
 
 
+def _format_earnings_summary(summary: str) -> str:
+    """Format the structured earnings summary as styled HTML."""
+    if not summary:
+        return "<p>No summary available.</p>"
+
+    # Define section styling
+    section_styles = {
+        "HIGHLIGHTS": {"icon": "📈", "color": "#16a34a", "bg": "#f0fdf4"},
+        "LOWLIGHTS": {"icon": "📉", "color": "#dc2626", "bg": "#fef2f2"},
+        "ANALYST REACTIONS": {"icon": "🎯", "color": "#7c3aed", "bg": "#f5f3ff"},
+        "FORWARD OUTLOOK": {"icon": "🔮", "color": "#0369a1", "bg": "#f0f9ff"},
+    }
+
+    html_parts = []
+    current_section = None
+    current_items = []
+
+    for line in summary.split("\n"):
+        line = line.strip()
+        if not line:
+            continue
+
+        # Check if this is a section header
+        is_header = False
+        for section_name in section_styles:
+            if line.upper().startswith(section_name):
+                # Save previous section if exists
+                if current_section and current_items:
+                    html_parts.append(_render_earnings_section(current_section, current_items, section_styles))
+                current_section = section_name
+                current_items = []
+                is_header = True
+                break
+
+        if not is_header and current_section:
+            # Clean up bullet points
+            if line.startswith("-"):
+                line = line[1:].strip()
+            if line.startswith("•"):
+                line = line[1:].strip()
+            if line:
+                current_items.append(line)
+
+    # Don't forget the last section
+    if current_section and current_items:
+        html_parts.append(_render_earnings_section(current_section, current_items, section_styles))
+
+    if html_parts:
+        return "\n".join(html_parts)
+    else:
+        # Fallback if structured format wasn't found
+        return f"<p style='color: #374151; line-height: 1.6;'>{summary}</p>"
+
+
+def _render_earnings_section(section_name: str, items: list[str], styles: dict) -> str:
+    """Render a single earnings section as HTML."""
+    style = styles.get(section_name, {"icon": "•", "color": "#374151", "bg": "#f5f5f5"})
+
+    items_html = "".join(f"<li style='margin-bottom: 4px;'>{item}</li>" for item in items)
+
+    return f"""
+<div style="background: {style['bg']}; border-left: 3px solid {style['color']}; padding: 10px 14px; margin-bottom: 10px; border-radius: 0 6px 6px 0;">
+    <p style="margin: 0 0 6px 0; font-weight: 600; color: {style['color']}; font-size: 13px;">
+        {style['icon']} {section_name}
+    </p>
+    <ul style="margin: 0; padding-left: 18px; color: #374151; font-size: 14px; line-height: 1.5;">
+        {items_html}
+    </ul>
+</div>
+"""
+
+
 def _generate_portfolio_summary(tickers: list[Ticker]) -> str:
     """Generate portfolio summary header with key stats."""
     if not tickers:
@@ -148,7 +220,7 @@ def _generate_valuation_table(tickers: list[Ticker]) -> str:
             change_color = "#16a34a" if t.daily_change > 0 else "#dc2626" if t.daily_change < 0 else "#666"
             pe_str = f"{t.trailing_pe:.1f}" if t.trailing_pe else "-"
             fwd_pe_str = f"{t.forward_pe:.1f}" if t.forward_pe else "-"
-            yield_str = f"{t.dividend_yield * 100:.1f}%" if t.dividend_yield else "-"
+            yield_str = f"{t.dividend_yield:.2f}%" if t.dividend_yield else "-"
             cap_str = _format_market_cap(t.market_cap)
 
             rows.append(f"""
@@ -407,19 +479,27 @@ def generate_html_body(
         results = []
         if event.actual_eps and event.eps_estimate:
             diff = "beat" if event.actual_eps > event.eps_estimate else "missed"
-            results.append(f"EPS: ${event.actual_eps:.2f} ({diff} ${event.eps_estimate:.2f})")
+            diff_pct = ((event.actual_eps - event.eps_estimate) / abs(event.eps_estimate)) * 100 if event.eps_estimate != 0 else 0
+            color = "#16a34a" if diff == "beat" else "#dc2626"
+            results.append(f"<span style='color: {color};'>EPS: ${event.actual_eps:.2f} ({diff} by {abs(diff_pct):.1f}%)</span>")
         if event.actual_revenue and event.revenue_estimate:
             diff = "beat" if event.actual_revenue > event.revenue_estimate else "missed"
             actual_b = event.actual_revenue / 1e9
-            est_b = event.revenue_estimate / 1e9
-            results.append(f"Revenue: ${actual_b:.1f}B ({diff} ${est_b:.1f}B)")
+            diff_pct = ((event.actual_revenue - event.revenue_estimate) / event.revenue_estimate) * 100 if event.revenue_estimate != 0 else 0
+            color = "#16a34a" if diff == "beat" else "#dc2626"
+            results.append(f"<span style='color: {color};'>Revenue: ${actual_b:.1f}B ({diff} by {abs(diff_pct):.1f}%)</span>")
         results_str = " | ".join(results) if results else ""
+
+        # Format the structured summary with styled sections
+        formatted_summary = _format_earnings_summary(summary)
 
         sections.append(f"""
 <h3>{event.symbol} - {event.company_name}</h3>
 <p><strong>Earnings Report</strong> (Reported: {date_str})</p>
-{"<p><strong>Results:</strong> " + results_str + "</p>" if results_str else ""}
-<p><strong>Summary:</strong> {summary}</p>
+{"<p style='font-size: 15px; margin: 8px 0;'>" + results_str + "</p>" if results_str else ""}
+<div style="margin-top: 12px;">
+{formatted_summary}
+</div>
 <hr>
 """)
 

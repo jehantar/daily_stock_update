@@ -65,7 +65,7 @@ Instructions:
 
 
 def analyze_earnings_report(event: EarningsEvent, news_items: list[NewsItem]) -> str:
-    """Generate AI summary of an earnings report."""
+    """Generate comprehensive AI summary of an earnings report."""
     client = get_openai_client()
 
     news_context = format_news_for_prompt(news_items)
@@ -73,30 +73,45 @@ def analyze_earnings_report(event: EarningsEvent, news_items: list[NewsItem]) ->
     eps_info = ""
     if event.eps_estimate and event.actual_eps:
         beat_miss = "beat" if event.actual_eps > event.eps_estimate else "missed"
-        eps_info = f"EPS: ${event.actual_eps:.2f} actual vs ${event.eps_estimate:.2f} expected ({beat_miss})"
+        diff_pct = ((event.actual_eps - event.eps_estimate) / abs(event.eps_estimate)) * 100 if event.eps_estimate != 0 else 0
+        eps_info = f"EPS: ${event.actual_eps:.2f} actual vs ${event.eps_estimate:.2f} expected ({beat_miss} by {abs(diff_pct):.1f}%)"
 
     revenue_info = ""
     if event.revenue_estimate and event.actual_revenue:
         beat_miss = "beat" if event.actual_revenue > event.revenue_estimate else "missed"
         rev_b = event.actual_revenue / 1e9
         est_b = event.revenue_estimate / 1e9
-        revenue_info = f"Revenue: ${rev_b:.2f}B actual vs ${est_b:.2f}B expected ({beat_miss})"
+        diff_pct = ((event.actual_revenue - event.revenue_estimate) / event.revenue_estimate) * 100 if event.revenue_estimate != 0 else 0
+        revenue_info = f"Revenue: ${rev_b:.2f}B actual vs ${est_b:.2f}B expected ({beat_miss} by {abs(diff_pct):.1f}%)"
 
-    prompt = f"""Summarize the earnings report for {event.symbol} ({event.company_name}).
+    prompt = f"""Provide a comprehensive earnings analysis for {event.symbol} ({event.company_name}).
 
 Earnings date: {event.date.strftime('%B %d, %Y')}
 {eps_info}
 {revenue_info}
 
-Recent news and coverage:
+Recent news and analyst coverage:
 {news_context}
 
+Provide your analysis in this exact format:
+
+HIGHLIGHTS:
+- [2-3 bullet points on positive results, beats, strong segments, raised guidance]
+
+LOWLIGHTS:
+- [2-3 bullet points on misses, weak segments, concerns, lowered guidance]
+
+ANALYST REACTIONS:
+- [Key analyst upgrades/downgrades, price target changes, sentiment shifts from coverage]
+
+FORWARD OUTLOOK:
+- [Management guidance, growth expectations, key metrics to watch]
+
 Instructions:
-- Provide a brief summary of the earnings results
-- Highlight 2-3 key insights (guidance, segment performance, notable quotes)
-- If market reaction data is in the news, mention it
-- Keep response under 150 words
-- Do not use markdown formatting
+- Be specific with numbers and percentages where available
+- If information is not available in the news, write "Not available in current coverage"
+- Focus on what investors care about most
+- Do not use markdown formatting beyond the section headers above
 - Write in a professional, concise style"""
 
     try:

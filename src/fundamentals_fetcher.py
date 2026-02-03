@@ -18,7 +18,7 @@ MIN_REQUEST_INTERVAL = 0.5  # seconds between API calls
 _last_request_time = 0
 
 # Columns to fetch from each dimension
-MRQ_COLUMNS = ["ticker", "dimension", "calendardate", "revenueusd", "eps", "fcf", "grossmargin", "netmargin"]
+MRQ_COLUMNS = ["ticker", "dimension", "calendardate", "revenueusd", "eps", "fcf", "ebitda", "grossmargin", "netmargin", "opmargin"]
 ART_COLUMNS = ["ticker", "dimension", "calendardate", "roe", "roa"]
 
 
@@ -31,10 +31,12 @@ class FundamentalData:
     revenue_growth: list[float | None]
     eps_growth: list[float | None]
     fcf_growth: list[float | None]
+    ebitda_growth: list[float | None]
     roe: list[float | None]
     roa: list[float | None]
     gross_margin: list[float | None]
     net_margin: list[float | None]
+    operating_margin: list[float | None]
 
 
 def ensure_api_key() -> str:
@@ -170,7 +172,7 @@ def fetch_fundamentals(
 
     print(f"  Fetching MRQ data for {len(symbols)} tickers...")
     mrq_df = _fetch_sf1_data(api_key, symbols, "MRQ", MRQ_COLUMNS, start_date, end_date)
-    mrq_df = _add_growth_columns(mrq_df, ["revenueusd", "eps", "fcf"])
+    mrq_df = _add_growth_columns(mrq_df, ["revenueusd", "eps", "fcf", "ebitda"])
 
     print(f"  Fetching ART data for {len(symbols)} tickers...")
     art_df = _fetch_sf1_data(api_key, symbols, "ART", ART_COLUMNS, start_date, end_date)
@@ -217,10 +219,12 @@ def fetch_fundamentals(
             revenue_growth=safe_list("revenueusd_growth"),
             eps_growth=safe_list("eps_growth"),
             fcf_growth=safe_list("fcf_growth"),
+            ebitda_growth=safe_list("ebitda_growth"),
             roe=safe_list("roe"),
             roa=safe_list("roa"),
             gross_margin=safe_list("grossmargin"),
             net_margin=safe_list("netmargin"),
+            operating_margin=safe_list("opmargin"),
         )
 
     return results
