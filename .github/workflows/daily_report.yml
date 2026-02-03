@@ -1,12 +1,11 @@
 name: Daily Stock Report
 
+# Primary trigger: cron-job.org calls repository_dispatch at 3 PM PT weekdays
+# This is more reliable than GitHub's built-in schedule which can delay 10-60+ min
 on:
-  schedule:
-    # Run at 11 PM UTC (3 PM Pacific) on weekdays - backup trigger
-    - cron: '0 23 * * 1-5'
-  workflow_dispatch: # Allow manual trigger
-  repository_dispatch: # Allow external trigger via API
+  repository_dispatch:
     types: [daily-report]
+  workflow_dispatch: # Allow manual trigger from GitHub UI
 
 jobs:
   generate-report:
