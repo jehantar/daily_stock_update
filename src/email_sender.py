@@ -143,7 +143,7 @@ def _generate_valuation_table(tickers: list[Ticker]) -> str:
     <td colspan="6" style="padding: 8px; font-weight: bold; color: #475569;">{category}</td>
 </tr>""")
 
-        for t in sector_tickers:
+        for t in category_tickers:
             change_str = format_change(t.daily_change)
             change_color = "#16a34a" if t.daily_change > 0 else "#dc2626" if t.daily_change < 0 else "#666"
             pe_str = f"{t.trailing_pe:.1f}" if t.trailing_pe else "-"
