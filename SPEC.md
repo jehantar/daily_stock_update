@@ -7,8 +7,8 @@ Automated daily stock monitoring system that analyzes portfolio movements, track
 
 ## Core Features
 
-### 1. Price Movement Detection (>5% Movers)
-- **Threshold**: Daily price change exceeds ±5%
+### 1. Price Movement Detection (>3% Movers)
+- **Threshold**: Daily price change exceeds ±3%
 - **Data Source**: Yahoo Finance for real-time price data
 - **Extended Hours**: Fetch supplementary pre-market/after-hours data to explain gaps
 - **Analysis Output**: AI-synthesized explanation of why the stock moved
@@ -29,6 +29,11 @@ Automated daily stock monitoring system that analyzes portfolio movements, track
 - **History Depth**: 6 quarters
 - **Visualization**: Line charts with markers, embedded as CID attachments
 - **Outlier Handling**: IQR-based detection with axis capping and value annotations
+
+### 5. Valuation Snapshot
+- **Data Source**: Yahoo Finance
+- **Metrics**: Trailing P/E, Forward P/E, Price/Cash Flow (P/CF), Dividend Yield, Market Cap
+- **Display**: Table grouped by custom categories (Platform Tech, Semiconductors, Enterprise Software, Commerce, Financials, Resources/Materials/Life Sciences)
 
 ---
 
@@ -71,12 +76,16 @@ Automated daily stock monitoring system that analyzes portfolio movements, track
 - Date appended for filtering
 
 ### Body Sections
-1. **Big Movers**: Stocks with >5% daily change
+1. **Big Movers**: Stocks with >3% daily change
    - Direction indicator (UP/DOWN)
    - Extended hours movement if available
    - AI-synthesized "Why it moved" analysis
 
-2. **Upcoming Earnings**: Stocks reporting within 1 day
+2. **Valuation Snapshot**: All tracked tickers
+   - Trailing P/E, Forward P/E, P/CF, Dividend Yield, Market Cap
+   - Grouped by custom categories
+
+3. **Upcoming Earnings**: Stocks reporting within 1 day
    - Expected date and time (before/after market)
    - EPS and revenue estimates
 
@@ -93,7 +102,7 @@ Automated daily stock monitoring system that analyzes portfolio movements, track
    - Profitability chart: ROE, ROA, Gross Margin, Net Margin (%)
 
 ### Email Behavior
-- **Quiet days**: No email sent if no >5% movers AND no earnings news
+- **Quiet days**: No email sent if no >3% movers AND no earnings news
 - **Market holidays**: Skip email entirely
 - **Send time**: 3 PM Pacific on weekdays
 - **Recipient**: Same Gmail account that sends it
@@ -246,7 +255,7 @@ sentiment_tracker/
 ├── src/
 │   ├── main.py                   # Entry point (8-step workflow)
 │   ├── data_fetcher.py           # CSV + Yahoo Finance data fetching
-│   ├── price_analyzer.py         # >5% movement detection
+│   ├── price_analyzer.py         # >3% movement detection
 │   ├── earnings_tracker.py       # Earnings calendar logic
 │   ├── news_aggregator.py        # Multi-source news gathering
 │   ├── ai_analyzer.py            # OpenAI API integration

@@ -4,7 +4,8 @@ Automated daily stock monitoring that delivers AI-analyzed insights via email.
 
 ## Features
 
-- **Big Movers Alert**: Stocks with >5% daily change, with AI-synthesized explanation
+- **Big Movers Alert**: Stocks with >3% daily change, with AI-synthesized explanation
+- **Valuation Snapshot**: Table with P/E, Fwd P/E, P/CF, Dividend Yield, and Market Cap for all tickers
 - **Earnings Calendar**: Reminder 1 day before scheduled earnings calls
 - **Earnings Summaries**: Key insights from recent earnings reports
 - **Fundamental Trends**: Quarterly line charts showing growth and profitability metrics
@@ -77,6 +78,7 @@ The email includes:
 - Price change with direction indicator
 - Extended hours movement (if available)
 - AI analysis of why it moved
+- Valuation snapshot (P/E, Fwd P/E, P/CF, Yield, Mkt Cap)
 - Upcoming earnings alerts
 - Post-earnings summaries
 - Earnings calendar for all tickers
@@ -125,7 +127,7 @@ sentiment_tracker/
 ├── src/
 │   ├── main.py               # Entry point
 │   ├── data_fetcher.py       # CSV/Gist fetching, Yahoo Finance prices
-│   ├── price_analyzer.py     # >5% movement detection
+│   ├── price_analyzer.py     # >3% movement detection
 │   ├── earnings_tracker.py   # Finnhub earnings calendar
 │   ├── news_aggregator.py    # Multi-source news
 │   ├── ai_analyzer.py        # OpenAI gpt-5-mini integration
