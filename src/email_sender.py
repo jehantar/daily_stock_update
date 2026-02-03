@@ -418,7 +418,7 @@ def generate_html_body(
 
     # Big Movers Section
     if movers:
-        sections.append("<h3>Big Movers (>5%)</h3>")
+        sections.append("<h3>Big Movers (>3%)</h3>")
 
     for mover, analysis in movers:
         change = format_change(mover.daily_change)

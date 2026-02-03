@@ -5,7 +5,7 @@ Sentiment Tracker - Daily Stock Report Generator
 Orchestrates the daily workflow:
 1. Fetch tickers from CSV (GitHub Gist)
 2. Fetch price data from Yahoo Finance
-3. Identify >5% price movers
+3. Identify >3% price movers
 4. Fetch fundamentals and generate charts
 5. Check earnings calendar
 6. Generate AI analysis for movers
@@ -80,10 +80,10 @@ def main():
     # Build company names dict for later use
     company_names = {t.symbol: t.company_name for t in tickers}
 
-    # Step 3: Identify big movers (>5%)
+    # Step 3: Identify big movers (>3%)
     print("Analyzing price movements...")
-    movers = identify_movers(tickers, threshold=0.05)
-    print(f"Found {len(movers)} stocks with >5% movement")
+    movers = identify_movers(tickers, threshold=0.03)
+    print(f"Found {len(movers)} stocks with >3% movement")
 
     # Step 4: Check earnings calendar (moved up to filter fundamentals)
     print("Checking earnings calendar...")
