@@ -105,7 +105,7 @@ def fetch_price_data(symbols: list[str]) -> list[Ticker]:
             fifty_two_week_low = info.get("fiftyTwoWeekLow")
             trailing_pe = info.get("trailingPE")
             forward_pe = info.get("forwardPE")
-            price_to_cash_flow = info.get("priceToOperatingCashFlows")
+            price_to_cash_flow = info.get("priceToCashFlow")
             dividend_yield = info.get("dividendYield")
             market_cap = info.get("marketCap")
             sector = info.get("sector")
