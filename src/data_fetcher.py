@@ -105,9 +105,14 @@ def fetch_price_data(symbols: list[str]) -> list[Ticker]:
             fifty_two_week_low = info.get("fiftyTwoWeekLow")
             trailing_pe = info.get("trailingPE")
             forward_pe = info.get("forwardPE")
-            price_to_cash_flow = info.get("priceToCashFlow")
             dividend_yield = info.get("dividendYield")
             market_cap = info.get("marketCap")
+
+            # Calculate P/CF manually since the field isn't reliably available
+            operating_cashflow = info.get("operatingCashflow")
+            price_to_cash_flow = None
+            if market_cap and operating_cashflow and operating_cashflow > 0:
+                price_to_cash_flow = market_cap / operating_cashflow
             sector = info.get("sector")
             industry = info.get("industry")
 
