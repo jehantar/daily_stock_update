@@ -89,7 +89,7 @@ def main():
     print("Checking earnings calendar...")
     all_earnings = get_earnings_calendar(symbols)
     upcoming_earnings = get_upcoming_earnings(symbols, days_ahead=1)
-    recent_earnings = get_recent_earnings(symbols, days_back=1)
+    recent_earnings = get_recent_earnings(symbols, days_back=2)
     earnings_with_dates = sum(1 for e in all_earnings.values() if e and e.is_upcoming)
     print(f"Upcoming earnings: {len(upcoming_earnings)}, Recent reports: {len(recent_earnings)}, Scheduled: {earnings_with_dates}")
 

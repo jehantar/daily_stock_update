@@ -43,7 +43,16 @@ def get_earnings_calendar(symbols: list[str]) -> dict[str, EarningsEvent | None]
             if earnings and "earningsCalendar" in earnings:
                 for event in earnings["earningsCalendar"]:
                     event_date = datetime.strptime(event["date"], "%Y-%m-%d").date()
-                    is_upcoming = event_date >= today
+                    # Consider earnings as "reported" (not upcoming) if:
+                    # 1. Date is in the past, OR
+                    # 2. Date is today AND actual_eps exists (results already released)
+                    actual_eps = event.get("epsActual")
+                    if event_date < today:
+                        is_upcoming = False
+                    elif event_date == today and actual_eps is not None:
+                        is_upcoming = False  # Same-day earnings already reported
+                    else:
+                        is_upcoming = True
 
                     results[symbol] = EarningsEvent(
                         symbol=symbol,
