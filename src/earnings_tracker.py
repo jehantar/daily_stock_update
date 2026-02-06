@@ -40,6 +40,23 @@ def get_finnhub_client() -> finnhub.Client:
     return finnhub.Client(api_key=api_key)
 
 
+# Sharadar uses different ticker symbols for some companies
+SHARADAR_TICKER_MAP = {
+    "GOOG": "GOOGL",  # Alphabet Class C -> Class A
+}
+
+
+def _map_to_sharadar_ticker(symbol: str) -> str:
+    """Map a ticker symbol to its Sharadar equivalent."""
+    return SHARADAR_TICKER_MAP.get(symbol, symbol)
+
+
+def _map_from_sharadar_ticker(sharadar_ticker: str) -> str:
+    """Map a Sharadar ticker back to the original symbol."""
+    reverse_map = {v: k for k, v in SHARADAR_TICKER_MAP.items()}
+    return reverse_map.get(sharadar_ticker, sharadar_ticker)
+
+
 def _earnings_date_to_quarter_end(earnings_date: datetime) -> str:
     """Map an earnings report date to its fiscal quarter end date.
 
@@ -77,6 +94,10 @@ def _fetch_sharadar_actuals(symbols: list[str], earnings_dates: dict[str, dateti
 
     api_key = ensure_api_key()
 
+    # Map symbols to Sharadar tickers and build reverse lookup
+    sharadar_tickers = [_map_to_sharadar_ticker(s) for s in symbols]
+    sharadar_to_original = {_map_to_sharadar_ticker(s): s for s in symbols}
+
     # Determine date range for query - need to cover all possible quarter ends
     all_quarter_ends = [_earnings_date_to_quarter_end(dt) for dt in earnings_dates.values()]
     if not all_quarter_ends:
@@ -90,7 +111,7 @@ def _fetch_sharadar_actuals(symbols: list[str], earnings_dates: dict[str, dateti
     print(f"  [Sharadar] Fetching actuals for {len(symbols)} symbols...")
 
     try:
-        df = _fetch_sf1_data(api_key, symbols, "MRQ", columns, min_date, max_date)
+        df = _fetch_sf1_data(api_key, sharadar_tickers, "MRQ", columns, min_date, max_date)
     except Exception as e:
         print(f"  [Sharadar] Failed to fetch data: {e}")
         return {}
@@ -105,11 +126,12 @@ def _fetch_sharadar_actuals(symbols: list[str], earnings_dates: dict[str, dateti
         if symbol not in earnings_dates:
             continue
 
+        sharadar_ticker = _map_to_sharadar_ticker(symbol)
         expected_quarter = _earnings_date_to_quarter_end(earnings_dates[symbol])
         expected_dt = datetime.strptime(expected_quarter, "%Y-%m-%d")
 
-        # Find matching row for this symbol and quarter
-        ticker_df = df[df["ticker"] == symbol]
+        # Find matching row for this symbol and quarter (using Sharadar ticker)
+        ticker_df = df[df["ticker"] == sharadar_ticker]
         if ticker_df.empty:
             continue
 
