@@ -21,3 +21,4 @@ Thumbs.db
 
 # Local testing
 *.log
+run_local.sh

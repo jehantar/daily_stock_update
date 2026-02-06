@@ -3,6 +3,8 @@ from datetime import datetime, timedelta
 from dataclasses import dataclass
 import finnhub
 
+from src.fundamentals_fetcher import ensure_api_key, _fetch_sf1_data
+
 
 def _get_effective_today() -> datetime:
     """Get the effective 'today' date, allowing override via REPORT_DATE env var.
@@ -36,12 +38,117 @@ def get_finnhub_client() -> finnhub.Client:
     return finnhub.Client(api_key=api_key)
 
 
+def _earnings_date_to_quarter_end(earnings_date: datetime) -> str:
+    """Map an earnings report date to its fiscal quarter end date.
+
+    Earnings reports come out 1-2 months after quarter end:
+    - Jan-Mar earnings -> Q4 of previous year (Dec 31)
+    - Apr-Jun earnings -> Q1 (Mar 31)
+    - Jul-Sep earnings -> Q2 (Jun 30)
+    - Oct-Dec earnings -> Q3 (Sep 30)
+    """
+    month = earnings_date.month
+    year = earnings_date.year
+
+    if month <= 3:  # Jan-Mar -> Q4 previous year
+        return f"{year - 1}-12-31"
+    elif month <= 6:  # Apr-Jun -> Q1
+        return f"{year}-03-31"
+    elif month <= 9:  # Jul-Sep -> Q2
+        return f"{year}-06-30"
+    else:  # Oct-Dec -> Q3
+        return f"{year}-09-30"
+
+
+def _fetch_sharadar_actuals(symbols: list[str], earnings_dates: dict[str, datetime]) -> dict[str, dict]:
+    """Fetch actual EPS and revenue from Sharadar for given symbols.
+
+    Args:
+        symbols: List of ticker symbols
+        earnings_dates: Dict mapping symbol -> earnings report date
+
+    Returns:
+        Dict mapping symbol -> {eps: float, revenue: float} or empty dict if not found
+    """
+    if not symbols:
+        return {}
+
+    api_key = ensure_api_key()
+
+    # Determine date range for query - need to cover all possible quarter ends
+    all_quarter_ends = [_earnings_date_to_quarter_end(dt) for dt in earnings_dates.values()]
+    if not all_quarter_ends:
+        return {}
+
+    min_date = min(all_quarter_ends)
+    max_date = max(all_quarter_ends)
+
+    # Fetch MRQ data (eps and revenueusd columns)
+    columns = ["ticker", "dimension", "calendardate", "eps", "revenueusd"]
+    print(f"  [Sharadar] Fetching actuals for {len(symbols)} symbols...")
+
+    try:
+        df = _fetch_sf1_data(api_key, symbols, "MRQ", columns, min_date, max_date)
+    except Exception as e:
+        print(f"  [Sharadar] Failed to fetch data: {e}")
+        return {}
+
+    if df.empty:
+        print("  [Sharadar] No data returned")
+        return {}
+
+    # Build result dict by matching each symbol to its expected quarter
+    results = {}
+    for symbol in symbols:
+        if symbol not in earnings_dates:
+            continue
+
+        expected_quarter = _earnings_date_to_quarter_end(earnings_dates[symbol])
+        expected_dt = datetime.strptime(expected_quarter, "%Y-%m-%d")
+
+        # Find matching row for this symbol and quarter
+        ticker_df = df[df["ticker"] == symbol]
+        if ticker_df.empty:
+            continue
+
+        # Match by calendardate
+        match = ticker_df[ticker_df["calendardate"] == expected_dt]
+        if match.empty:
+            # Try closest date within 15 days (accounts for slight variations)
+            ticker_df = ticker_df.copy()
+            ticker_df["date_diff"] = abs((ticker_df["calendardate"] - expected_dt).dt.days)
+            close_matches = ticker_df[ticker_df["date_diff"] <= 15]
+            if not close_matches.empty:
+                match = close_matches.loc[[close_matches["date_diff"].idxmin()]]
+
+        if not match.empty:
+            row = match.iloc[0]
+            eps = row.get("eps")
+            revenue = row.get("revenueusd")
+
+            # Only include if we have at least one actual value
+            if eps is not None or revenue is not None:
+                results[symbol] = {
+                    "eps": float(eps) if eps is not None and not (isinstance(eps, float) and eps != eps) else None,
+                    "revenue": float(revenue) if revenue is not None and not (isinstance(revenue, float) and revenue != revenue) else None,
+                    "quarter": str(row["calendardate"].date()),
+                }
+                print(f"  [Sharadar] {symbol} Q{expected_quarter}: EPS={results[symbol]['eps']}, Rev={results[symbol]['revenue']}")
+
+    return results
+
+
 def get_earnings_calendar(symbols: list[str]) -> dict[str, EarningsEvent | None]:
-    """Get next earnings date for each symbol."""
+    """Get next earnings date for each symbol.
+
+    Uses Finnhub for calendar dates/timing/estimates, but prefers Sharadar/SF1
+    for actual reported EPS and revenue (more reliable data).
+    """
     client = get_finnhub_client()
     today = _get_effective_today().date()
     results = {}
 
+    # First pass: get calendar data from Finnhub
     for symbol in symbols:
         try:
             # Get earnings calendar for this symbol
@@ -121,6 +228,38 @@ def get_earnings_calendar(symbols: list[str]) -> dict[str, EarningsEvent | None]
 
         except Exception:
             results[symbol] = None
+
+    # Second pass: fetch Sharadar actuals for reported earnings (more reliable)
+    reported_symbols = [
+        symbol for symbol, event in results.items()
+        if event is not None and not event.is_upcoming
+    ]
+
+    if reported_symbols:
+        # Build earnings dates dict for Sharadar lookup
+        earnings_dates = {
+            symbol: results[symbol].date
+            for symbol in reported_symbols
+        }
+
+        sharadar_actuals = _fetch_sharadar_actuals(reported_symbols, earnings_dates)
+
+        # Override Finnhub actuals with Sharadar data when available
+        for symbol, actuals in sharadar_actuals.items():
+            event = results[symbol]
+            sharadar_eps = actuals.get("eps")
+            sharadar_revenue = actuals.get("revenue")
+
+            # Prefer Sharadar values, but keep Finnhub as fallback
+            if sharadar_eps is not None:
+                if event.actual_eps != sharadar_eps:
+                    print(f"  [Hybrid] {symbol}: Using Sharadar EPS {sharadar_eps} (Finnhub had {event.actual_eps})")
+                event.actual_eps = sharadar_eps
+
+            if sharadar_revenue is not None:
+                if event.actual_revenue != sharadar_revenue:
+                    print(f"  [Hybrid] {symbol}: Using Sharadar revenue {sharadar_revenue} (Finnhub had {event.actual_revenue})")
+                event.actual_revenue = sharadar_revenue
 
     return results
 
