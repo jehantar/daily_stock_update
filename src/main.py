@@ -13,6 +13,7 @@ Orchestrates the daily workflow:
 8. Send email report
 """
 
+import os
 import sys
 from datetime import datetime
 
@@ -26,10 +27,18 @@ from src.fundamentals_fetcher import fetch_fundamentals
 from src.chart_generator import generate_all_charts
 
 
+def _get_effective_today() -> datetime:
+    """Get the effective 'today' date, allowing override via REPORT_DATE env var."""
+    override = os.environ.get("REPORT_DATE")
+    if override:
+        return datetime.strptime(override, "%Y-%m-%d")
+    return datetime.now()
+
+
 def is_market_holiday() -> bool:
     """Check if today is a US market holiday."""
     # Simple weekend check - market is closed Sat/Sun
-    today = datetime.now()
+    today = _get_effective_today()
     if today.weekday() >= 5:  # Saturday = 5, Sunday = 6
         return True
 
@@ -53,7 +62,12 @@ def is_market_holiday() -> bool:
 
 def main():
     """Main entry point for daily report generation."""
-    print(f"Starting Sentiment Tracker - {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+    effective_date = _get_effective_today()
+    report_date_str = os.environ.get("REPORT_DATE")
+    if report_date_str:
+        print(f"Starting Sentiment Tracker - SIMULATING DATE: {effective_date.strftime('%Y-%m-%d')}")
+    else:
+        print(f"Starting Sentiment Tracker - {effective_date.strftime('%Y-%m-%d %H:%M:%S')}")
 
     # Check for market holidays
     if is_market_holiday():

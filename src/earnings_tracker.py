@@ -4,6 +4,17 @@ from dataclasses import dataclass
 import finnhub
 
 
+def _get_effective_today() -> datetime:
+    """Get the effective 'today' date, allowing override via REPORT_DATE env var.
+
+    Set REPORT_DATE=YYYY-MM-DD to simulate running the report on a past date.
+    """
+    override = os.environ.get("REPORT_DATE")
+    if override:
+        return datetime.strptime(override, "%Y-%m-%d")
+    return datetime.now()
+
+
 @dataclass
 class EarningsEvent:
     symbol: str
@@ -28,7 +39,7 @@ def get_finnhub_client() -> finnhub.Client:
 def get_earnings_calendar(symbols: list[str]) -> dict[str, EarningsEvent | None]:
     """Get next earnings date for each symbol."""
     client = get_finnhub_client()
-    today = datetime.now().date()
+    today = _get_effective_today().date()
     results = {}
 
     for symbol in symbols:
@@ -111,7 +122,7 @@ def get_earnings_calendar(symbols: list[str]) -> dict[str, EarningsEvent | None]
 def get_upcoming_earnings(symbols: list[str], days_ahead: int = 1) -> list[EarningsEvent]:
     """Get earnings events happening within the specified days."""
     calendar = get_earnings_calendar(symbols)
-    today = datetime.now().date()
+    today = _get_effective_today().date()
     target_date = today + timedelta(days=days_ahead)
 
     upcoming = []
@@ -127,7 +138,7 @@ def get_upcoming_earnings(symbols: list[str], days_ahead: int = 1) -> list[Earni
 def get_recent_earnings(symbols: list[str], days_back: int = 1) -> list[EarningsEvent]:
     """Get earnings events that happened within the specified days."""
     calendar = get_earnings_calendar(symbols)
-    today = datetime.now().date()
+    today = _get_effective_today().date()
     cutoff_date = today - timedelta(days=days_back)
 
     recent = []

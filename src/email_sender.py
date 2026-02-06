@@ -11,6 +11,14 @@ from src.earnings_tracker import EarningsEvent, format_earnings_time
 from src.chart_generator import ChartPair
 
 
+def _get_effective_today() -> datetime:
+    """Get the effective 'today' date, allowing override via REPORT_DATE env var."""
+    override = os.environ.get("REPORT_DATE")
+    if override:
+        return datetime.strptime(override, "%Y-%m-%d")
+    return datetime.now()
+
+
 def _format_market_cap(market_cap: int | None) -> str:
     """Format market cap as human-readable string (e.g., $1.2T, $580B, $45M)."""
     if market_cap is None:
@@ -376,7 +384,7 @@ def generate_subject(
     recent_earnings: list[tuple[EarningsEvent, str]],
 ) -> str:
     """Generate alert-style subject line."""
-    today = datetime.now().strftime("%b %d, %Y")
+    today = _get_effective_today().strftime("%b %d, %Y")
     parts = []
 
     # Add top mover
@@ -408,7 +416,7 @@ def generate_html_body(
     tickers: list[Ticker] = None,
 ) -> str:
     """Generate minimal HTML email body."""
-    today = datetime.now().strftime("%B %d, %Y")
+    today = _get_effective_today().strftime("%B %d, %Y")
 
     sections = [f"<h2>Daily Stock Report - {today}</h2>"]
 

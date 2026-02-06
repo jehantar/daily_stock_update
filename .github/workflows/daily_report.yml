@@ -6,6 +6,11 @@ on:
   repository_dispatch:
     types: [daily-report]
   workflow_dispatch: # Allow manual trigger from GitHub UI
+    inputs:
+      report_date:
+        description: 'Simulate a specific date (YYYY-MM-DD). Leave empty for today.'
+        required: false
+        type: string
 
 jobs:
   generate-report:
@@ -33,5 +38,6 @@ jobs:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           FINNHUB_API_KEY: ${{ secrets.FINNHUB_API_KEY }}
           NASDAQ_DATA_LINK_API_KEY: ${{ secrets.NASDAQ_DATA_LINK_API_KEY }}
+          REPORT_DATE: ${{ github.event.inputs.report_date }}
           PYTHONPATH: ${{ github.workspace }}
         run: python src/main.py
