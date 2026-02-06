@@ -118,11 +118,23 @@ def _safe_float(value) -> float | None:
         return None
 
 
-def _calc_qoq_change(current: float | None, prior: float | None) -> float | None:
-    """Calculate QoQ percentage change."""
+def _calc_pct_change(current: float | None, prior: float | None) -> float | None:
+    """Calculate percentage change between two values."""
     if current is None or prior is None or prior == 0:
         return None
     return ((current - prior) / abs(prior)) * 100
+
+
+def _calc_capex_change(current: float | None, prior: float | None) -> float | None:
+    """Calculate CapEx percentage change using absolute values.
+
+    CapEx is reported as negative (cash outflow), so we use absolute values.
+    A larger negative = increased spending = positive growth.
+    """
+    if current is None or prior is None or prior == 0:
+        return None
+    # Use absolute values: -12B vs -10B = 20% increase in spending
+    return ((abs(current) - abs(prior)) / abs(prior)) * 100
 
 
 def _fetch_sharadar_actuals(symbols: list[str], earnings_dates: dict[str, datetime]) -> dict[str, dict]:
@@ -237,12 +249,12 @@ def _fetch_sharadar_actuals(symbols: list[str], earnings_dates: dict[str, dateti
 
             fundamental_context = FundamentalContext(
                 # QoQ changes
-                revenue_qoq_change=_calc_qoq_change(revenue, prior_revenue),
-                eps_qoq_change=_calc_qoq_change(eps, prior_eps),
+                revenue_qoq_change=_calc_pct_change(revenue, prior_revenue),
+                eps_qoq_change=_calc_pct_change(eps, prior_eps),
                 fcf=current_fcf,
-                fcf_qoq_change=_calc_qoq_change(current_fcf, prior_fcf),
+                fcf_qoq_change=_calc_pct_change(current_fcf, prior_fcf),
                 capex=current_capex,
-                capex_qoq_change=_calc_qoq_change(current_capex, prior_capex),
+                capex_qoq_change=_calc_capex_change(current_capex, prior_capex),
                 gross_margin=_safe_float(current.get("grossmargin")),
                 gross_margin_prior=_safe_float(prior.get("grossmargin")) if prior is not None else None,
                 net_margin=_safe_float(current.get("netmargin")),
@@ -250,10 +262,10 @@ def _fetch_sharadar_actuals(symbols: list[str], earnings_dates: dict[str, dateti
                 operating_margin=None,  # opmargin not available in Sharadar SF1
                 operating_margin_prior=None,
                 # YoY changes
-                revenue_yoy_change=_calc_qoq_change(revenue, yoy_revenue),
-                eps_yoy_change=_calc_qoq_change(eps, yoy_eps),
-                fcf_yoy_change=_calc_qoq_change(current_fcf, yoy_fcf),
-                capex_yoy_change=_calc_qoq_change(current_capex, yoy_capex),
+                revenue_yoy_change=_calc_pct_change(revenue, yoy_revenue),
+                eps_yoy_change=_calc_pct_change(eps, yoy_eps),
+                fcf_yoy_change=_calc_pct_change(current_fcf, yoy_fcf),
+                capex_yoy_change=_calc_capex_change(current_capex, yoy_capex),
                 gross_margin_yoy=_safe_float(prior_year.get("grossmargin")) if prior_year is not None else None,
                 net_margin_yoy=_safe_float(prior_year.get("netmargin")) if prior_year is not None else None,
                 operating_margin_yoy=None,
