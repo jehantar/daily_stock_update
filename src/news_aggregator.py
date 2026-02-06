@@ -127,7 +127,7 @@ def format_news_for_prompt(news_items: list[NewsItem]) -> str:
 
         lines.append(f"- [{item.source}]{date_str}: {item.headline}")
         if item.summary:
-            lines.append(f"  Summary: {item.summary[:200]}...")
+            lines.append(f"  Summary: {item.summary[:500]}")
 
     return "\n".join(lines)
 
@@ -139,24 +139,26 @@ def search_earnings_call_coverage(symbol: str, company_name: str, limit: int = 3
     """
     results = []
 
-    # Build search query for earnings call coverage
+    # Build search queries targeting free, accessible sources
     quarter = _get_recent_quarter()
     search_queries = [
-        f"{company_name} earnings call {quarter} transcript CEO quotes",
-        f"{symbol} earnings call highlights Q&A",
+        f"{company_name} {quarter} earnings results analyst reaction",
+        f"{symbol} earnings call {quarter} highlights guidance outlook",
+        f"site:fool.com {symbol} {quarter} earnings call transcript",
+        f"{company_name} earnings {quarter} CEO CFO quotes guidance",
     ]
 
     urls_to_fetch = set()
 
     for query in search_queries:
         try:
-            search_results = _duckduckgo_search(query, max_results=3)
+            search_results = _duckduckgo_search(query, max_results=5)
             urls_to_fetch.update(search_results)
         except Exception:
             continue
 
-    # Fetch and extract content from found URLs
-    for url in list(urls_to_fetch)[:limit * 2]:  # Fetch more, filter later
+    # Fetch and extract content from found URLs (try more to account for paywalls)
+    for url in list(urls_to_fetch)[:limit * 3]:
         try:
             context = _extract_earnings_content(url)
             if context and len(context.content) > 200:  # Only keep substantial content
@@ -209,7 +211,7 @@ def _duckduckgo_search(query: str, max_results: int = 5) -> list[str]:
 
     urls = []
     # DuckDuckGo HTML results have links in result__a class
-    for link in soup.find_all("a", class_="result__a", limit=max_results * 2):
+    for link in soup.find_all("a", class_="result__a", limit=max_results * 3):
         href = link.get("href", "")
         if href and href.startswith("http"):
             # Filter for financial news sites
@@ -224,17 +226,20 @@ def _duckduckgo_search(query: str, max_results: int = 5) -> list[str]:
 def _is_relevant_source(url: str) -> bool:
     """Check if URL is from a relevant financial news source."""
     relevant_domains = [
-        "seekingalpha.com",
         "fool.com",
         "cnbc.com",
-        "bloomberg.com",
         "reuters.com",
         "marketwatch.com",
-        "barrons.com",
-        "investors.com",
-        "thestreet.com",
         "benzinga.com",
         "zacks.com",
+        "thestreet.com",
+        "investors.com",
+        "finance.yahoo.com",
+        "seekingalpha.com",
+        "bloomberg.com",
+        "barrons.com",
+        "tipranks.com",
+        "investing.com",
     ]
     url_lower = url.lower()
     return any(domain in url_lower for domain in relevant_domains)
