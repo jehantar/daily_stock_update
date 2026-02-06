@@ -41,12 +41,40 @@ def get_earnings_calendar(symbols: list[str]) -> dict[str, EarningsEvent | None]
             )
 
             if earnings and "earningsCalendar" in earnings:
-                for event in earnings["earningsCalendar"]:
+                events_list = earnings["earningsCalendar"]
+
+                # Sort events by date to ensure chronological order
+                events_list = sorted(events_list, key=lambda e: e.get("date", "9999-99-99"))
+
+                # Find the most relevant event:
+                # 1. Priority: Recently reported earnings (with actual_eps, within past 7 days)
+                # 2. Fallback: Nearest upcoming/future earnings
+                best_event = None
+                nearest_upcoming = None
+
+                for event in events_list:
                     event_date = datetime.strptime(event["date"], "%Y-%m-%d").date()
+                    actual_eps = event.get("epsActual")
+
+                    # Check if this is a recently reported earnings (with actual results)
+                    if actual_eps is not None and event_date <= today:
+                        # Reported earnings takes priority - use the most recent one
+                        best_event = event
+
+                    # Track the nearest upcoming/future event as fallback
+                    if nearest_upcoming is None and event_date >= today and event.get("epsActual") is None:
+                        nearest_upcoming = event
+
+                # Use reported earnings if found, otherwise use nearest upcoming
+                selected_event = best_event if best_event else nearest_upcoming
+
+                if selected_event:
+                    event_date = datetime.strptime(selected_event["date"], "%Y-%m-%d").date()
+                    actual_eps = selected_event.get("epsActual")
+
                     # Consider earnings as "reported" (not upcoming) if:
                     # 1. Date is in the past, OR
                     # 2. Date is today AND actual_eps exists (results already released)
-                    actual_eps = event.get("epsActual")
                     if event_date < today:
                         is_upcoming = False
                     elif event_date == today and actual_eps is not None:
@@ -56,16 +84,15 @@ def get_earnings_calendar(symbols: list[str]) -> dict[str, EarningsEvent | None]
 
                     results[symbol] = EarningsEvent(
                         symbol=symbol,
-                        company_name=event.get("symbol", symbol),
-                        date=datetime.strptime(event["date"], "%Y-%m-%d"),
-                        time=event.get("hour", "unknown"),
-                        eps_estimate=event.get("epsEstimate"),
-                        revenue_estimate=event.get("revenueEstimate"),
+                        company_name=selected_event.get("symbol", symbol),
+                        date=datetime.strptime(selected_event["date"], "%Y-%m-%d"),
+                        time=selected_event.get("hour", "unknown"),
+                        eps_estimate=selected_event.get("epsEstimate"),
+                        revenue_estimate=selected_event.get("revenueEstimate"),
                         is_upcoming=is_upcoming,
-                        actual_eps=event.get("epsActual"),
-                        actual_revenue=event.get("revenueActual")
+                        actual_eps=selected_event.get("epsActual"),
+                        actual_revenue=selected_event.get("revenueActual")
                     )
-                    break  # Take the first (nearest) earnings event
             else:
                 results[symbol] = None
 
