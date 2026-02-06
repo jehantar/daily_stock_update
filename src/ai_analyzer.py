@@ -121,18 +121,20 @@ LOWLIGHTS:
 - [2-3 bullet points on misses, weak segments, concerns, lowered guidance]
 
 ANALYST REACTIONS:
-- [Key analyst upgrades/downgrades, price target changes, sentiment shifts from coverage]
+- [Key analyst upgrades/downgrades, price target changes, sentiment shifts mentioned in the news coverage]
 
 FORWARD OUTLOOK:
-- [Management guidance, growth expectations, key metrics to watch]
+- [Management guidance, growth expectations, key metrics to watch based on the coverage]
 
 KEY QUOTES:
-- [1-2 notable quotes from CEO/CFO on the earnings call, if available in the coverage]
+- [1-2 notable direct quotes from CEO/CFO if found in the coverage. If no direct quotes are available, write "No direct quotes available in current coverage"]
 
 Instructions:
 - Be specific with numbers and percentages where available
-- Include direct quotes from executives when found in the coverage
-- If information is not available, write "Not available in current coverage"
+- For ANALYST REACTIONS: Synthesize from the news coverage provided. Look for mentions of analyst ratings, price targets, upgrades, downgrades, or Wall Street sentiment. If the news mentions analyst commentary even indirectly, include it.
+- For FORWARD OUTLOOK: Extract any forward-looking statements, guidance, or expectations mentioned in the news. Include management commentary on future quarters if available.
+- For KEY QUOTES: Only include actual direct quotes found in the coverage. Do not fabricate quotes.
+- Every section except KEY QUOTES must have substantive content. Use the earnings results data and news context to provide analysis even when coverage is limited.
 - Focus on what investors care about most
 - Do not use markdown formatting beyond the section headers above
 - Write in a professional, concise style"""

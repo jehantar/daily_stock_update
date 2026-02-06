@@ -53,6 +53,12 @@ def get_earnings_calendar(symbols: list[str]) -> dict[str, EarningsEvent | None]
 
             if earnings and "earningsCalendar" in earnings:
                 events_list = earnings["earningsCalendar"]
+                # Log raw data for debugging earnings accuracy
+                for e in events_list:
+                    if e.get("epsActual") is not None or e.get("date", "") >= str(today - timedelta(days=3)):
+                        print(f"  [Finnhub] {symbol} {e.get('date')}: "
+                              f"EPS actual={e.get('epsActual')} est={e.get('epsEstimate')} | "
+                              f"Rev actual={e.get('revenueActual')} est={e.get('revenueEstimate')}")
 
                 # Sort events by date to ensure chronological order
                 events_list = sorted(events_list, key=lambda e: e.get("date", "9999-99-99"))
