@@ -47,26 +47,32 @@ def get_earnings_calendar(symbols: list[str]) -> dict[str, EarningsEvent | None]
                 events_list = sorted(events_list, key=lambda e: e.get("date", "9999-99-99"))
 
                 # Find the most relevant event:
-                # 1. Priority: Recently reported earnings (with actual_eps, within past 7 days)
-                # 2. Fallback: Nearest upcoming/future earnings
-                best_event = None
+                # 1. Priority: Past events with actual_eps (confirmed reported)
+                # 2. Second: Past events without actual_eps (reported but results pending in API)
+                # 3. Fallback: Nearest upcoming/future earnings
+                reported_with_results = None
+                reported_pending_results = None
                 nearest_upcoming = None
 
                 for event in events_list:
                     event_date = datetime.strptime(event["date"], "%Y-%m-%d").date()
                     actual_eps = event.get("epsActual")
 
-                    # Check if this is a recently reported earnings (with actual results)
-                    if actual_eps is not None and event_date <= today:
-                        # Reported earnings takes priority - use the most recent one
-                        best_event = event
+                    if event_date <= today:
+                        # Past or today's event
+                        if actual_eps is not None:
+                            # Has actual results - highest priority (keep most recent)
+                            reported_with_results = event
+                        else:
+                            # No results yet but date has passed - second priority
+                            reported_pending_results = event
+                    else:
+                        # Future event - track first one as fallback
+                        if nearest_upcoming is None:
+                            nearest_upcoming = event
 
-                    # Track the nearest upcoming/future event as fallback
-                    if nearest_upcoming is None and event_date >= today and event.get("epsActual") is None:
-                        nearest_upcoming = event
-
-                # Use reported earnings if found, otherwise use nearest upcoming
-                selected_event = best_event if best_event else nearest_upcoming
+                # Priority: confirmed results > pending results > upcoming
+                selected_event = reported_with_results or reported_pending_results or nearest_upcoming
 
                 if selected_event:
                     event_date = datetime.strptime(selected_event["date"], "%Y-%m-%d").date()
