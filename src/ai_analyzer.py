@@ -108,40 +108,82 @@ def analyze_earnings_report(
     fundamental_trends = ""
     ctx = event.fundamental_context
     if ctx:
-        trends = []
+        # QoQ trends
+        qoq_trends = []
         if ctx.revenue_qoq_change is not None:
-            trends.append(f"Revenue QoQ: {ctx.revenue_qoq_change:+.1f}%")
+            qoq_trends.append(f"Revenue: {ctx.revenue_qoq_change:+.1f}%")
         if ctx.eps_qoq_change is not None:
-            trends.append(f"EPS QoQ: {ctx.eps_qoq_change:+.1f}%")
+            qoq_trends.append(f"EPS: {ctx.eps_qoq_change:+.1f}%")
+        if ctx.fcf_qoq_change is not None:
+            qoq_trends.append(f"FCF: {ctx.fcf_qoq_change:+.1f}%")
+        if ctx.capex_qoq_change is not None:
+            qoq_trends.append(f"CapEx: {ctx.capex_qoq_change:+.1f}%")
+
+        # YoY trends (more meaningful for seasonality)
+        yoy_trends = []
+        if ctx.revenue_yoy_change is not None:
+            yoy_trends.append(f"Revenue: {ctx.revenue_yoy_change:+.1f}%")
+        if ctx.eps_yoy_change is not None:
+            yoy_trends.append(f"EPS: {ctx.eps_yoy_change:+.1f}%")
+        if ctx.fcf_yoy_change is not None:
+            yoy_trends.append(f"FCF: {ctx.fcf_yoy_change:+.1f}%")
+        if ctx.capex_yoy_change is not None:
+            yoy_trends.append(f"CapEx: {ctx.capex_yoy_change:+.1f}%")
+
+        # Absolute values with context
+        absolutes = []
         if ctx.fcf is not None:
             fcf_b = ctx.fcf / 1e9
-            fcf_trend = f" ({ctx.fcf_qoq_change:+.1f}% QoQ)" if ctx.fcf_qoq_change is not None else ""
-            trends.append(f"Free Cash Flow: ${fcf_b:.2f}B{fcf_trend}")
+            absolutes.append(f"Free Cash Flow: ${fcf_b:.2f}B")
         if ctx.capex is not None:
-            capex_b = abs(ctx.capex) / 1e9  # CapEx is often negative, show absolute
-            capex_trend = f" ({ctx.capex_qoq_change:+.1f}% QoQ)" if ctx.capex_qoq_change is not None else ""
-            trends.append(f"CapEx: ${capex_b:.2f}B{capex_trend}")
-        if ctx.gross_margin is not None:
-            gm_change = ""
-            if ctx.gross_margin_prior is not None:
-                gm_diff = (ctx.gross_margin - ctx.gross_margin_prior) * 100  # Convert to percentage points
-                gm_change = f" ({gm_diff:+.1f}pp vs prior Q)"
-            trends.append(f"Gross Margin: {ctx.gross_margin*100:.1f}%{gm_change}")
-        if ctx.operating_margin is not None:
-            om_change = ""
-            if ctx.operating_margin_prior is not None:
-                om_diff = (ctx.operating_margin - ctx.operating_margin_prior) * 100
-                om_change = f" ({om_diff:+.1f}pp vs prior Q)"
-            trends.append(f"Operating Margin: {ctx.operating_margin*100:.1f}%{om_change}")
-        if ctx.net_margin is not None:
-            nm_change = ""
-            if ctx.net_margin_prior is not None:
-                nm_diff = (ctx.net_margin - ctx.net_margin_prior) * 100
-                nm_change = f" ({nm_diff:+.1f}pp vs prior Q)"
-            trends.append(f"Net Margin: {ctx.net_margin*100:.1f}%{nm_change}")
+            capex_b = abs(ctx.capex) / 1e9
+            absolutes.append(f"CapEx: ${capex_b:.2f}B")
 
-        if trends:
-            fundamental_trends = "Quarter-over-Quarter Trends:\n" + "\n".join(f"- {t}" for t in trends)
+        # Margins with QoQ and YoY comparison
+        margins = []
+        if ctx.gross_margin is not None:
+            gm_parts = [f"Gross Margin: {ctx.gross_margin*100:.1f}%"]
+            if ctx.gross_margin_prior is not None:
+                gm_qoq = (ctx.gross_margin - ctx.gross_margin_prior) * 100
+                gm_parts.append(f"{gm_qoq:+.1f}pp QoQ")
+            if ctx.gross_margin_yoy is not None:
+                gm_yoy = (ctx.gross_margin - ctx.gross_margin_yoy) * 100
+                gm_parts.append(f"{gm_yoy:+.1f}pp YoY")
+            margins.append(" | ".join(gm_parts))
+
+        if ctx.operating_margin is not None:
+            om_parts = [f"Operating Margin: {ctx.operating_margin*100:.1f}%"]
+            if ctx.operating_margin_prior is not None:
+                om_qoq = (ctx.operating_margin - ctx.operating_margin_prior) * 100
+                om_parts.append(f"{om_qoq:+.1f}pp QoQ")
+            if ctx.operating_margin_yoy is not None:
+                om_yoy = (ctx.operating_margin - ctx.operating_margin_yoy) * 100
+                om_parts.append(f"{om_yoy:+.1f}pp YoY")
+            margins.append(" | ".join(om_parts))
+
+        if ctx.net_margin is not None:
+            nm_parts = [f"Net Margin: {ctx.net_margin*100:.1f}%"]
+            if ctx.net_margin_prior is not None:
+                nm_qoq = (ctx.net_margin - ctx.net_margin_prior) * 100
+                nm_parts.append(f"{nm_qoq:+.1f}pp QoQ")
+            if ctx.net_margin_yoy is not None:
+                nm_yoy = (ctx.net_margin - ctx.net_margin_yoy) * 100
+                nm_parts.append(f"{nm_yoy:+.1f}pp YoY")
+            margins.append(" | ".join(nm_parts))
+
+        # Build the full trends section
+        sections = []
+        if yoy_trends:
+            sections.append("Year-over-Year Growth:\n" + "\n".join(f"- {t}" for t in yoy_trends))
+        if qoq_trends:
+            sections.append("Quarter-over-Quarter Growth:\n" + "\n".join(f"- {t}" for t in qoq_trends))
+        if absolutes:
+            sections.append("Key Metrics:\n" + "\n".join(f"- {t}" for t in absolutes))
+        if margins:
+            sections.append("Margins:\n" + "\n".join(f"- {t}" for t in margins))
+
+        if sections:
+            fundamental_trends = "\n\n".join(sections)
 
     prompt = f"""Provide a comprehensive earnings analysis for {event.symbol} ({event.company_name}).
 

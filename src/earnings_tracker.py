@@ -21,8 +21,9 @@ def _get_effective_today() -> datetime:
 
 @dataclass
 class FundamentalContext:
-    """QoQ fundamental trends from Sharadar for earnings analysis."""
-    revenue_qoq_change: float | None = None  # Percentage change
+    """QoQ and YoY fundamental trends from Sharadar for earnings analysis."""
+    # Quarter-over-Quarter changes
+    revenue_qoq_change: float | None = None
     eps_qoq_change: float | None = None
     fcf: float | None = None  # Current quarter FCF
     fcf_qoq_change: float | None = None
@@ -34,6 +35,14 @@ class FundamentalContext:
     net_margin_prior: float | None = None
     operating_margin: float | None = None
     operating_margin_prior: float | None = None
+    # Year-over-Year changes (same quarter, prior year)
+    revenue_yoy_change: float | None = None
+    eps_yoy_change: float | None = None
+    fcf_yoy_change: float | None = None
+    capex_yoy_change: float | None = None
+    gross_margin_yoy: float | None = None  # Same quarter last year
+    net_margin_yoy: float | None = None
+    operating_margin_yoy: float | None = None
 
 
 @dataclass
@@ -134,14 +143,14 @@ def _fetch_sharadar_actuals(symbols: list[str], earnings_dates: dict[str, dateti
     # Map symbols to Sharadar tickers
     sharadar_tickers = [_map_to_sharadar_ticker(s) for s in symbols]
 
-    # Determine date range - expand to include prior quarter for QoQ calculations
+    # Determine date range - expand to include prior year for YoY calculations
     all_quarter_ends = [_earnings_date_to_quarter_end(dt) for dt in earnings_dates.values()]
     if not all_quarter_ends:
         return {}
 
-    # Go back ~120 days from min date to capture prior quarter
+    # Go back ~400 days from min date to capture same quarter from prior year
     min_date_dt = datetime.strptime(min(all_quarter_ends), "%Y-%m-%d")
-    min_date = (min_date_dt - timedelta(days=120)).strftime("%Y-%m-%d")
+    min_date = (min_date_dt - timedelta(days=400)).strftime("%Y-%m-%d")
     max_date = max(all_quarter_ends)
 
     # Fetch MRQ data with additional columns for fundamental context
@@ -193,22 +202,40 @@ def _fetch_sharadar_actuals(symbols: list[str], earnings_dates: dict[str, dateti
         if eps is None and revenue is None:
             continue
 
-        # Find prior quarter for QoQ calculations
+        # Build fundamental context with QoQ and YoY changes
+        fundamental_context = None
         current_date = current["calendardate"]
+
+        # Find prior quarter (QoQ)
         prior_quarters = ticker_df[ticker_df["calendardate"] < current_date]
         prior = prior_quarters.iloc[-1] if not prior_quarters.empty else None
 
-        # Build fundamental context with QoQ changes
-        fundamental_context = None
-        if prior is not None:
-            prior_eps = _safe_float(prior.get("eps"))
-            prior_revenue = _safe_float(prior.get("revenueusd"))
-            prior_fcf = _safe_float(prior.get("fcf"))
+        # Find same quarter from prior year (YoY) - look for date ~365 days back
+        prior_year_date = current_date - pd.Timedelta(days=365)
+        prior_year_quarters = ticker_df[
+            (ticker_df["calendardate"] >= prior_year_date - pd.Timedelta(days=30)) &
+            (ticker_df["calendardate"] <= prior_year_date + pd.Timedelta(days=30))
+        ]
+        prior_year = prior_year_quarters.iloc[0] if not prior_year_quarters.empty else None
+
+        if prior is not None or prior_year is not None:
             current_fcf = _safe_float(current.get("fcf"))
-            prior_capex = _safe_float(prior.get("capex"))
             current_capex = _safe_float(current.get("capex"))
 
+            # QoQ values
+            prior_eps = _safe_float(prior.get("eps")) if prior is not None else None
+            prior_revenue = _safe_float(prior.get("revenueusd")) if prior is not None else None
+            prior_fcf = _safe_float(prior.get("fcf")) if prior is not None else None
+            prior_capex = _safe_float(prior.get("capex")) if prior is not None else None
+
+            # YoY values (same quarter, prior year)
+            yoy_eps = _safe_float(prior_year.get("eps")) if prior_year is not None else None
+            yoy_revenue = _safe_float(prior_year.get("revenueusd")) if prior_year is not None else None
+            yoy_fcf = _safe_float(prior_year.get("fcf")) if prior_year is not None else None
+            yoy_capex = _safe_float(prior_year.get("capex")) if prior_year is not None else None
+
             fundamental_context = FundamentalContext(
+                # QoQ changes
                 revenue_qoq_change=_calc_qoq_change(revenue, prior_revenue),
                 eps_qoq_change=_calc_qoq_change(eps, prior_eps),
                 fcf=current_fcf,
@@ -216,11 +243,19 @@ def _fetch_sharadar_actuals(symbols: list[str], earnings_dates: dict[str, dateti
                 capex=current_capex,
                 capex_qoq_change=_calc_qoq_change(current_capex, prior_capex),
                 gross_margin=_safe_float(current.get("grossmargin")),
-                gross_margin_prior=_safe_float(prior.get("grossmargin")),
+                gross_margin_prior=_safe_float(prior.get("grossmargin")) if prior is not None else None,
                 net_margin=_safe_float(current.get("netmargin")),
-                net_margin_prior=_safe_float(prior.get("netmargin")),
+                net_margin_prior=_safe_float(prior.get("netmargin")) if prior is not None else None,
                 operating_margin=_safe_float(current.get("opmargin")),
-                operating_margin_prior=_safe_float(prior.get("opmargin")),
+                operating_margin_prior=_safe_float(prior.get("opmargin")) if prior is not None else None,
+                # YoY changes
+                revenue_yoy_change=_calc_qoq_change(revenue, yoy_revenue),
+                eps_yoy_change=_calc_qoq_change(eps, yoy_eps),
+                fcf_yoy_change=_calc_qoq_change(current_fcf, yoy_fcf),
+                capex_yoy_change=_calc_qoq_change(current_capex, yoy_capex),
+                gross_margin_yoy=_safe_float(prior_year.get("grossmargin")) if prior_year is not None else None,
+                net_margin_yoy=_safe_float(prior_year.get("netmargin")) if prior_year is not None else None,
+                operating_margin_yoy=_safe_float(prior_year.get("opmargin")) if prior_year is not None else None,
             )
 
         results[symbol] = {
