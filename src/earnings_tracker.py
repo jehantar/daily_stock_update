@@ -20,6 +20,21 @@ def _get_effective_today() -> datetime:
 
 
 @dataclass
+class FundamentalContext:
+    """QoQ fundamental trends from Sharadar for earnings analysis."""
+    revenue_qoq_change: float | None = None  # Percentage change
+    eps_qoq_change: float | None = None
+    fcf: float | None = None  # Current quarter FCF
+    fcf_qoq_change: float | None = None
+    gross_margin: float | None = None  # Current quarter
+    gross_margin_prior: float | None = None  # Prior quarter for comparison
+    net_margin: float | None = None
+    net_margin_prior: float | None = None
+    operating_margin: float | None = None
+    operating_margin_prior: float | None = None
+
+
+@dataclass
 class EarningsEvent:
     symbol: str
     company_name: str
@@ -30,6 +45,7 @@ class EarningsEvent:
     is_upcoming: bool  # True if earnings haven't happened yet
     actual_eps: float | None = None
     actual_revenue: float | None = None
+    fundamental_context: FundamentalContext | None = None  # QoQ trends from Sharadar
 
 
 def get_finnhub_client() -> finnhub.Client:
@@ -79,35 +95,55 @@ def _earnings_date_to_quarter_end(earnings_date: datetime) -> str:
         return f"{year}-09-30"
 
 
+def _safe_float(value) -> float | None:
+    """Convert value to float, handling NaN and None."""
+    if value is None:
+        return None
+    if isinstance(value, float) and value != value:  # NaN check
+        return None
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def _calc_qoq_change(current: float | None, prior: float | None) -> float | None:
+    """Calculate QoQ percentage change."""
+    if current is None or prior is None or prior == 0:
+        return None
+    return ((current - prior) / abs(prior)) * 100
+
+
 def _fetch_sharadar_actuals(symbols: list[str], earnings_dates: dict[str, datetime]) -> dict[str, dict]:
-    """Fetch actual EPS and revenue from Sharadar for given symbols.
+    """Fetch actual EPS, revenue, and fundamental context from Sharadar.
 
     Args:
         symbols: List of ticker symbols
         earnings_dates: Dict mapping symbol -> earnings report date
 
     Returns:
-        Dict mapping symbol -> {eps: float, revenue: float} or empty dict if not found
+        Dict mapping symbol -> {eps, revenue, fundamental_context} or empty dict if not found
     """
     if not symbols:
         return {}
 
     api_key = ensure_api_key()
 
-    # Map symbols to Sharadar tickers and build reverse lookup
+    # Map symbols to Sharadar tickers
     sharadar_tickers = [_map_to_sharadar_ticker(s) for s in symbols]
-    sharadar_to_original = {_map_to_sharadar_ticker(s): s for s in symbols}
 
-    # Determine date range for query - need to cover all possible quarter ends
+    # Determine date range - expand to include prior quarter for QoQ calculations
     all_quarter_ends = [_earnings_date_to_quarter_end(dt) for dt in earnings_dates.values()]
     if not all_quarter_ends:
         return {}
 
-    min_date = min(all_quarter_ends)
+    # Go back ~120 days from min date to capture prior quarter
+    min_date_dt = datetime.strptime(min(all_quarter_ends), "%Y-%m-%d")
+    min_date = (min_date_dt - timedelta(days=120)).strftime("%Y-%m-%d")
     max_date = max(all_quarter_ends)
 
-    # Fetch MRQ data (eps and revenueusd columns)
-    columns = ["ticker", "dimension", "calendardate", "eps", "revenueusd"]
+    # Fetch MRQ data with additional columns for fundamental context
+    columns = ["ticker", "dimension", "calendardate", "eps", "revenueusd", "fcf", "grossmargin", "netmargin", "opmargin"]
     print(f"  [Sharadar] Fetching actuals for {len(symbols)} symbols...")
 
     try:
@@ -130,34 +166,70 @@ def _fetch_sharadar_actuals(symbols: list[str], earnings_dates: dict[str, dateti
         expected_quarter = _earnings_date_to_quarter_end(earnings_dates[symbol])
         expected_dt = datetime.strptime(expected_quarter, "%Y-%m-%d")
 
-        # Find matching row for this symbol and quarter (using Sharadar ticker)
-        ticker_df = df[df["ticker"] == sharadar_ticker]
+        # Find all rows for this ticker, sorted by date
+        ticker_df = df[df["ticker"] == sharadar_ticker].sort_values("calendardate")
         if ticker_df.empty:
             continue
 
-        # Match by calendardate
+        # Match current quarter by calendardate
         match = ticker_df[ticker_df["calendardate"] == expected_dt]
         if match.empty:
-            # Try closest date within 15 days (accounts for slight variations)
-            ticker_df = ticker_df.copy()
-            ticker_df["date_diff"] = abs((ticker_df["calendardate"] - expected_dt).dt.days)
-            close_matches = ticker_df[ticker_df["date_diff"] <= 15]
+            # Try closest date within 15 days
+            ticker_df_copy = ticker_df.copy()
+            ticker_df_copy["date_diff"] = abs((ticker_df_copy["calendardate"] - expected_dt).dt.days)
+            close_matches = ticker_df_copy[ticker_df_copy["date_diff"] <= 15]
             if not close_matches.empty:
                 match = close_matches.loc[[close_matches["date_diff"].idxmin()]]
 
-        if not match.empty:
-            row = match.iloc[0]
-            eps = row.get("eps")
-            revenue = row.get("revenueusd")
+        if match.empty:
+            continue
 
-            # Only include if we have at least one actual value
-            if eps is not None or revenue is not None:
-                results[symbol] = {
-                    "eps": float(eps) if eps is not None and not (isinstance(eps, float) and eps != eps) else None,
-                    "revenue": float(revenue) if revenue is not None and not (isinstance(revenue, float) and revenue != revenue) else None,
-                    "quarter": str(row["calendardate"].date()),
-                }
-                print(f"  [Sharadar] {symbol} Q{expected_quarter}: EPS={results[symbol]['eps']}, Rev={results[symbol]['revenue']}")
+        current = match.iloc[0]
+        eps = _safe_float(current.get("eps"))
+        revenue = _safe_float(current.get("revenueusd"))
+
+        if eps is None and revenue is None:
+            continue
+
+        # Find prior quarter for QoQ calculations
+        current_date = current["calendardate"]
+        prior_quarters = ticker_df[ticker_df["calendardate"] < current_date]
+        prior = prior_quarters.iloc[-1] if not prior_quarters.empty else None
+
+        # Build fundamental context with QoQ changes
+        fundamental_context = None
+        if prior is not None:
+            prior_eps = _safe_float(prior.get("eps"))
+            prior_revenue = _safe_float(prior.get("revenueusd"))
+            prior_fcf = _safe_float(prior.get("fcf"))
+            current_fcf = _safe_float(current.get("fcf"))
+
+            fundamental_context = FundamentalContext(
+                revenue_qoq_change=_calc_qoq_change(revenue, prior_revenue),
+                eps_qoq_change=_calc_qoq_change(eps, prior_eps),
+                fcf=current_fcf,
+                fcf_qoq_change=_calc_qoq_change(current_fcf, prior_fcf),
+                gross_margin=_safe_float(current.get("grossmargin")),
+                gross_margin_prior=_safe_float(prior.get("grossmargin")),
+                net_margin=_safe_float(current.get("netmargin")),
+                net_margin_prior=_safe_float(prior.get("netmargin")),
+                operating_margin=_safe_float(current.get("opmargin")),
+                operating_margin_prior=_safe_float(prior.get("opmargin")),
+            )
+
+        results[symbol] = {
+            "eps": eps,
+            "revenue": revenue,
+            "quarter": str(current["calendardate"].date()),
+            "fundamental_context": fundamental_context,
+        }
+
+        # Log with more detail
+        rev_b = f"${revenue/1e9:.2f}B" if revenue else "N/A"
+        print(f"  [Sharadar] {symbol} Q{expected_quarter}: EPS={eps}, Rev={rev_b}")
+        if fundamental_context and fundamental_context.revenue_qoq_change is not None:
+            print(f"    QoQ: Rev {fundamental_context.revenue_qoq_change:+.1f}%, "
+                  f"EPS {fundamental_context.eps_qoq_change:+.1f}% " if fundamental_context.eps_qoq_change else "")
 
     return results
 
@@ -342,22 +414,30 @@ def get_earnings_calendar(symbols: list[str]) -> dict[str, EarningsEvent | None]
 
         sharadar_actuals = _fetch_sharadar_actuals(reported_symbols, earnings_dates)
 
-        # Override Finnhub actuals with Sharadar data when available
+        # Always prefer Sharadar data over Finnhub (more reliable)
         for symbol, actuals in sharadar_actuals.items():
             event = results[symbol]
             sharadar_eps = actuals.get("eps")
             sharadar_revenue = actuals.get("revenue")
+            fundamental_context = actuals.get("fundamental_context")
 
-            # Prefer Sharadar values, but keep Finnhub as fallback
+            # Always use Sharadar EPS when available
             if sharadar_eps is not None:
                 if event.actual_eps != sharadar_eps:
                     print(f"  [Hybrid] {symbol}: Using Sharadar EPS {sharadar_eps} (Finnhub had {event.actual_eps})")
                 event.actual_eps = sharadar_eps
 
+            # Always use Sharadar revenue when available
             if sharadar_revenue is not None:
                 if event.actual_revenue != sharadar_revenue:
-                    print(f"  [Hybrid] {symbol}: Using Sharadar revenue {sharadar_revenue} (Finnhub had {event.actual_revenue})")
+                    rev_b = sharadar_revenue / 1e9
+                    finnhub_b = event.actual_revenue / 1e9 if event.actual_revenue else 0
+                    print(f"  [Hybrid] {symbol}: Using Sharadar revenue ${rev_b:.2f}B (Finnhub had ${finnhub_b:.2f}B)")
                 event.actual_revenue = sharadar_revenue
+
+            # Set fundamental context for earnings analysis
+            if fundamental_context is not None:
+                event.fundamental_context = fundamental_context
 
         # Third pass: try yfinance for symbols still missing data
         symbols_needing_data = [

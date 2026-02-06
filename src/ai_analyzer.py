@@ -8,7 +8,7 @@ from src.news_aggregator import (
     format_earnings_context_for_prompt,
 )
 from src.price_analyzer import PriceMover, format_change
-from src.earnings_tracker import EarningsEvent
+from src.earnings_tracker import EarningsEvent, FundamentalContext
 
 # Initialize client globally
 _client = None
@@ -104,11 +104,48 @@ def analyze_earnings_report(
         diff_pct = ((event.actual_revenue - event.revenue_estimate) / event.revenue_estimate) * 100 if event.revenue_estimate != 0 else 0
         revenue_info = f"Revenue: ${rev_b:.2f}B actual vs ${est_b:.2f}B expected ({beat_miss} by {abs(diff_pct):.1f}%)"
 
+    # Build fundamental trends section from Sharadar data
+    fundamental_trends = ""
+    ctx = event.fundamental_context
+    if ctx:
+        trends = []
+        if ctx.revenue_qoq_change is not None:
+            trends.append(f"Revenue QoQ: {ctx.revenue_qoq_change:+.1f}%")
+        if ctx.eps_qoq_change is not None:
+            trends.append(f"EPS QoQ: {ctx.eps_qoq_change:+.1f}%")
+        if ctx.fcf is not None:
+            fcf_b = ctx.fcf / 1e9
+            fcf_trend = f" ({ctx.fcf_qoq_change:+.1f}% QoQ)" if ctx.fcf_qoq_change is not None else ""
+            trends.append(f"Free Cash Flow: ${fcf_b:.2f}B{fcf_trend}")
+        if ctx.gross_margin is not None:
+            gm_change = ""
+            if ctx.gross_margin_prior is not None:
+                gm_diff = (ctx.gross_margin - ctx.gross_margin_prior) * 100  # Convert to percentage points
+                gm_change = f" ({gm_diff:+.1f}pp vs prior Q)"
+            trends.append(f"Gross Margin: {ctx.gross_margin*100:.1f}%{gm_change}")
+        if ctx.operating_margin is not None:
+            om_change = ""
+            if ctx.operating_margin_prior is not None:
+                om_diff = (ctx.operating_margin - ctx.operating_margin_prior) * 100
+                om_change = f" ({om_diff:+.1f}pp vs prior Q)"
+            trends.append(f"Operating Margin: {ctx.operating_margin*100:.1f}%{om_change}")
+        if ctx.net_margin is not None:
+            nm_change = ""
+            if ctx.net_margin_prior is not None:
+                nm_diff = (ctx.net_margin - ctx.net_margin_prior) * 100
+                nm_change = f" ({nm_diff:+.1f}pp vs prior Q)"
+            trends.append(f"Net Margin: {ctx.net_margin*100:.1f}%{nm_change}")
+
+        if trends:
+            fundamental_trends = "Quarter-over-Quarter Trends:\n" + "\n".join(f"- {t}" for t in trends)
+
     prompt = f"""Provide a comprehensive earnings analysis for {event.symbol} ({event.company_name}).
 
 Earnings date: {event.date.strftime('%B %d, %Y')}
 {eps_info}
 {revenue_info}
+
+{fundamental_trends}
 
 {full_context}
 
