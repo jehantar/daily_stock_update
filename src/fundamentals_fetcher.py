@@ -18,7 +18,7 @@ MIN_REQUEST_INTERVAL = 0.5  # seconds between API calls
 _last_request_time = 0
 
 # Columns to fetch from each dimension
-MRQ_COLUMNS = ["ticker", "dimension", "calendardate", "revenueusd", "eps", "fcf", "ebitda", "grossmargin", "netmargin", "opmargin"]
+MRQ_COLUMNS = ["ticker", "dimension", "calendardate", "revenueusd", "eps", "fcf", "ebitda", "grossmargin", "netmargin"]
 ART_COLUMNS = ["ticker", "dimension", "calendardate", "roe", "roa"]
 
 
@@ -224,7 +224,7 @@ def fetch_fundamentals(
             roa=safe_list("roa"),
             gross_margin=safe_list("grossmargin"),
             net_margin=safe_list("netmargin"),
-            operating_margin=safe_list("opmargin"),
+            operating_margin=[None] * len(ticker_data),  # opmargin not available in Sharadar SF1
         )
 
     return results

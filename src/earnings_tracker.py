@@ -154,7 +154,8 @@ def _fetch_sharadar_actuals(symbols: list[str], earnings_dates: dict[str, dateti
     max_date = max(all_quarter_ends)
 
     # Fetch MRQ data with additional columns for fundamental context
-    columns = ["ticker", "dimension", "calendardate", "eps", "revenueusd", "fcf", "capex", "grossmargin", "netmargin", "opmargin"]
+    # Note: opmargin doesn't exist in Sharadar SF1, so we skip operating margin
+    columns = ["ticker", "dimension", "calendardate", "eps", "revenueusd", "fcf", "capex", "grossmargin", "netmargin"]
     print(f"  [Sharadar] Fetching actuals for {len(symbols)} symbols...")
 
     try:
@@ -246,8 +247,8 @@ def _fetch_sharadar_actuals(symbols: list[str], earnings_dates: dict[str, dateti
                 gross_margin_prior=_safe_float(prior.get("grossmargin")) if prior is not None else None,
                 net_margin=_safe_float(current.get("netmargin")),
                 net_margin_prior=_safe_float(prior.get("netmargin")) if prior is not None else None,
-                operating_margin=_safe_float(current.get("opmargin")),
-                operating_margin_prior=_safe_float(prior.get("opmargin")) if prior is not None else None,
+                operating_margin=None,  # opmargin not available in Sharadar SF1
+                operating_margin_prior=None,
                 # YoY changes
                 revenue_yoy_change=_calc_qoq_change(revenue, yoy_revenue),
                 eps_yoy_change=_calc_qoq_change(eps, yoy_eps),
@@ -255,7 +256,7 @@ def _fetch_sharadar_actuals(symbols: list[str], earnings_dates: dict[str, dateti
                 capex_yoy_change=_calc_qoq_change(current_capex, yoy_capex),
                 gross_margin_yoy=_safe_float(prior_year.get("grossmargin")) if prior_year is not None else None,
                 net_margin_yoy=_safe_float(prior_year.get("netmargin")) if prior_year is not None else None,
-                operating_margin_yoy=_safe_float(prior_year.get("opmargin")) if prior_year is not None else None,
+                operating_margin_yoy=None,
             )
 
         results[symbol] = {
