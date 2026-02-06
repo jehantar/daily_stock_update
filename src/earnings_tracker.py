@@ -26,6 +26,8 @@ class FundamentalContext:
     eps_qoq_change: float | None = None
     fcf: float | None = None  # Current quarter FCF
     fcf_qoq_change: float | None = None
+    capex: float | None = None  # Current quarter CapEx
+    capex_qoq_change: float | None = None
     gross_margin: float | None = None  # Current quarter
     gross_margin_prior: float | None = None  # Prior quarter for comparison
     net_margin: float | None = None
@@ -143,7 +145,7 @@ def _fetch_sharadar_actuals(symbols: list[str], earnings_dates: dict[str, dateti
     max_date = max(all_quarter_ends)
 
     # Fetch MRQ data with additional columns for fundamental context
-    columns = ["ticker", "dimension", "calendardate", "eps", "revenueusd", "fcf", "grossmargin", "netmargin", "opmargin"]
+    columns = ["ticker", "dimension", "calendardate", "eps", "revenueusd", "fcf", "capex", "grossmargin", "netmargin", "opmargin"]
     print(f"  [Sharadar] Fetching actuals for {len(symbols)} symbols...")
 
     try:
@@ -203,12 +205,16 @@ def _fetch_sharadar_actuals(symbols: list[str], earnings_dates: dict[str, dateti
             prior_revenue = _safe_float(prior.get("revenueusd"))
             prior_fcf = _safe_float(prior.get("fcf"))
             current_fcf = _safe_float(current.get("fcf"))
+            prior_capex = _safe_float(prior.get("capex"))
+            current_capex = _safe_float(current.get("capex"))
 
             fundamental_context = FundamentalContext(
                 revenue_qoq_change=_calc_qoq_change(revenue, prior_revenue),
                 eps_qoq_change=_calc_qoq_change(eps, prior_eps),
                 fcf=current_fcf,
                 fcf_qoq_change=_calc_qoq_change(current_fcf, prior_fcf),
+                capex=current_capex,
+                capex_qoq_change=_calc_qoq_change(current_capex, prior_capex),
                 gross_margin=_safe_float(current.get("grossmargin")),
                 gross_margin_prior=_safe_float(prior.get("grossmargin")),
                 net_margin=_safe_float(current.get("netmargin")),

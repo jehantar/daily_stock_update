@@ -117,6 +117,10 @@ def analyze_earnings_report(
             fcf_b = ctx.fcf / 1e9
             fcf_trend = f" ({ctx.fcf_qoq_change:+.1f}% QoQ)" if ctx.fcf_qoq_change is not None else ""
             trends.append(f"Free Cash Flow: ${fcf_b:.2f}B{fcf_trend}")
+        if ctx.capex is not None:
+            capex_b = abs(ctx.capex) / 1e9  # CapEx is often negative, show absolute
+            capex_trend = f" ({ctx.capex_qoq_change:+.1f}% QoQ)" if ctx.capex_qoq_change is not None else ""
+            trends.append(f"CapEx: ${capex_b:.2f}B{capex_trend}")
         if ctx.gross_margin is not None:
             gm_change = ""
             if ctx.gross_margin_prior is not None:
