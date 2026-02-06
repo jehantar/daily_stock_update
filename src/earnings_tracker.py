@@ -2,6 +2,8 @@ import os
 from datetime import datetime, timedelta
 from dataclasses import dataclass
 import finnhub
+import yfinance as yf
+import pandas as pd
 
 from src.fundamentals_fetcher import ensure_api_key, _fetch_sf1_data
 
@@ -138,11 +140,85 @@ def _fetch_sharadar_actuals(symbols: list[str], earnings_dates: dict[str, dateti
     return results
 
 
+def _fetch_yfinance_actuals(symbols: list[str], earnings_dates: dict[str, datetime]) -> dict[str, dict]:
+    """Fetch actual EPS and revenue from yfinance for given symbols.
+
+    Args:
+        symbols: List of ticker symbols
+        earnings_dates: Dict mapping symbol -> earnings report date
+
+    Returns:
+        Dict mapping symbol -> {eps: float, revenue: float} or empty dict if not found
+    """
+    if not symbols:
+        return {}
+
+    results = {}
+    print(f"  [yfinance] Fetching actuals for {len(symbols)} symbols...")
+
+    for symbol in symbols:
+        if symbol not in earnings_dates:
+            continue
+
+        try:
+            ticker = yf.Ticker(symbol)
+            expected_quarter = _earnings_date_to_quarter_end(earnings_dates[symbol])
+            expected_dt = pd.Timestamp(expected_quarter)
+
+            # Get quarterly income statement
+            qi = ticker.quarterly_income_stmt
+            if qi is None or qi.empty:
+                continue
+
+            # Find matching quarter (within 15 days tolerance)
+            matched_col = None
+            for col in qi.columns:
+                if abs((col - expected_dt).days) <= 15:
+                    matched_col = col
+                    break
+
+            if matched_col is None:
+                continue
+
+            eps = None
+            revenue = None
+
+            # Get EPS (prefer Diluted)
+            if "Diluted EPS" in qi.index:
+                val = qi.loc["Diluted EPS", matched_col]
+                if pd.notna(val):
+                    eps = float(val)
+            elif "Basic EPS" in qi.index:
+                val = qi.loc["Basic EPS", matched_col]
+                if pd.notna(val):
+                    eps = float(val)
+
+            # Get Revenue
+            if "Total Revenue" in qi.index:
+                val = qi.loc["Total Revenue", matched_col]
+                if pd.notna(val):
+                    revenue = float(val)
+
+            if eps is not None or revenue is not None:
+                results[symbol] = {
+                    "eps": eps,
+                    "revenue": revenue,
+                    "quarter": str(matched_col.date()),
+                }
+                print(f"  [yfinance] {symbol} Q{expected_quarter}: EPS={eps}, Rev={revenue}")
+
+        except Exception as e:
+            print(f"  [yfinance] {symbol}: Failed to fetch - {e}")
+            continue
+
+    return results
+
+
 def get_earnings_calendar(symbols: list[str]) -> dict[str, EarningsEvent | None]:
     """Get next earnings date for each symbol.
 
     Uses Finnhub for calendar dates/timing/estimates, but prefers Sharadar/SF1
-    for actual reported EPS and revenue (more reliable data).
+    for actual reported EPS and revenue. Falls back to yfinance, then Finnhub.
     """
     client = get_finnhub_client()
     today = _get_effective_today().date()
@@ -260,6 +336,31 @@ def get_earnings_calendar(symbols: list[str]) -> dict[str, EarningsEvent | None]
                 if event.actual_revenue != sharadar_revenue:
                     print(f"  [Hybrid] {symbol}: Using Sharadar revenue {sharadar_revenue} (Finnhub had {event.actual_revenue})")
                 event.actual_revenue = sharadar_revenue
+
+        # Third pass: try yfinance for symbols still missing data
+        symbols_needing_data = [
+            symbol for symbol in reported_symbols
+            if symbol not in sharadar_actuals
+        ]
+
+        if symbols_needing_data:
+            yfinance_actuals = _fetch_yfinance_actuals(symbols_needing_data, earnings_dates)
+
+            for symbol, actuals in yfinance_actuals.items():
+                event = results[symbol]
+                yf_eps = actuals.get("eps")
+                yf_revenue = actuals.get("revenue")
+
+                # Use yfinance values where Finnhub data is missing or unreliable
+                if yf_eps is not None and event.actual_eps is None:
+                    print(f"  [Hybrid] {symbol}: Using yfinance EPS {yf_eps}")
+                    event.actual_eps = yf_eps
+
+                if yf_revenue is not None:
+                    # Prefer yfinance revenue over Finnhub (Finnhub often has segment data)
+                    if event.actual_revenue != yf_revenue:
+                        print(f"  [Hybrid] {symbol}: Using yfinance revenue {yf_revenue} (Finnhub had {event.actual_revenue})")
+                    event.actual_revenue = yf_revenue
 
     return results
 
