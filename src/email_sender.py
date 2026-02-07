@@ -283,7 +283,7 @@ def _generate_fundamentals_section(charts: dict[str, ChartPair]) -> str:
                 <img src="cid:{growth_cid}"
                      alt="{chart_pair.ticker} Growth Metrics"
                      style="width: 100%; max-width: 350px; height: auto;" />
-                <p style="font-size: 11px; color: #666; margin: 4px 0 0 0;">Growth (QoQ %): Revenue, EPS, FCF</p>
+                <p style="font-size: 11px; color: #666; margin: 4px 0 0 0;">Revenue, EBITDA & EPS (YoY %)</p>
             </td>
             <td style="width: 50%; padding: 4px; vertical-align: top;">
                 <img src="cid:{profit_cid}"

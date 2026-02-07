@@ -37,6 +37,13 @@ class FundamentalData:
     gross_margin: list[float | None]
     net_margin: list[float | None]
     operating_margin: list[float | None]
+    # Absolute values for bar charts
+    revenue: list[float | None] = None
+    eps: list[float | None] = None
+    ebitda_values: list[float | None] = None
+    # YoY growth rates
+    revenue_yoy: list[float | None] = None
+    eps_yoy: list[float | None] = None
 
 
 def ensure_api_key() -> str:
@@ -138,12 +145,26 @@ def _add_growth_columns(df: pd.DataFrame, value_columns: List[str]) -> pd.DataFr
     return df
 
 
+def _add_yoy_growth_columns(df: pd.DataFrame, value_columns: List[str]) -> pd.DataFrame:
+    """Calculate YoY (4-quarter) percentage change for specified columns."""
+    df = df.copy()
+    df = df.sort_values(["ticker", "calendardate"])
+
+    for col in value_columns:
+        if col in df.columns:
+            yoy_col = f"{col}_yoy"
+            df[yoy_col] = df.groupby("ticker")[col].pct_change(periods=4, fill_method=None)
+
+    df.replace([np.inf, -np.inf], np.nan, inplace=True)
+    return df
+
+
 def _get_date_range(quarters: int) -> tuple[str, str]:
     """Calculate start and end dates to cover the requested number of quarters."""
     today = pd.Timestamp.today()
     end_date = today + QuarterEnd(0)
-    # Need extra quarter for growth calculation
-    start_date = end_date - QuarterEnd(quarters + 1)
+    # Need extra quarters: +1 for QoQ growth, +4 for YoY growth
+    start_date = end_date - QuarterEnd(quarters + 5)
     return start_date.strftime("%Y-%m-%d"), end_date.strftime("%Y-%m-%d")
 
 
@@ -173,6 +194,7 @@ def fetch_fundamentals(
     print(f"  Fetching MRQ data for {len(symbols)} tickers...")
     mrq_df = _fetch_sf1_data(api_key, symbols, "MRQ", MRQ_COLUMNS, start_date, end_date)
     mrq_df = _add_growth_columns(mrq_df, ["revenueusd", "eps", "fcf", "ebitda"])
+    mrq_df = _add_yoy_growth_columns(mrq_df, ["revenueusd", "eps"])
 
     print(f"  Fetching ART data for {len(symbols)} tickers...")
     art_df = _fetch_sf1_data(api_key, symbols, "ART", ART_COLUMNS, start_date, end_date)
@@ -225,6 +247,11 @@ def fetch_fundamentals(
             gross_margin=safe_list("grossmargin"),
             net_margin=safe_list("netmargin"),
             operating_margin=[None] * len(ticker_data),  # opmargin not available in Sharadar SF1
+            revenue=safe_list("revenueusd"),
+            eps=safe_list("eps"),
+            ebitda_values=safe_list("ebitda"),
+            revenue_yoy=safe_list("revenueusd_yoy"),
+            eps_yoy=safe_list("eps_yoy"),
         )
 
     return results

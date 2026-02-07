@@ -14,7 +14,7 @@ from src.fundamentals_fetcher import FundamentalData
 
 # Chart configuration
 CHART_WIDTH = 3.2  # inches
-CHART_HEIGHT = 2.0  # inches
+CHART_HEIGHT = 3.0  # inches (two subplots for growth chart)
 CHART_DPI = 120  # Higher DPI for sharper images
 
 # Outlier detection threshold (values beyond this multiple of IQR are considered outliers)
@@ -68,6 +68,74 @@ def _fig_to_base64(fig: plt.Figure) -> str:
     buf.close()
     plt.close(fig)
     return img_base64
+
+
+def _format_revenue(value: float, _pos=None) -> str:
+    """Format revenue values for Y-axis ($50B, $500M, etc.)."""
+    abs_val = abs(value)
+    if abs_val >= 1e12:
+        return f"${value / 1e12:.1f}T"
+    elif abs_val >= 1e9:
+        return f"${value / 1e9:.0f}B"
+    elif abs_val >= 1e6:
+        return f"${value / 1e6:.0f}M"
+    elif abs_val >= 1e3:
+        return f"${value / 1e3:.0f}K"
+    else:
+        return f"${value:.0f}"
+
+
+def _format_eps(value: float, _pos=None) -> str:
+    """Format EPS values for Y-axis ($1.25)."""
+    return f"${value:.2f}"
+
+
+def _draw_metric_bars(
+    ax: plt.Axes,
+    x: np.ndarray,
+    values: list[float | None],
+    yoy: list[float | None],
+    color: str,
+    bar_width: float = 0.6,
+) -> None:
+    """Draw bars for absolute values with YoY% annotations (green/red)."""
+    for i, (val, yoy_val) in enumerate(zip(values, yoy)):
+        if val is None:
+            continue
+
+        ax.bar(x[i], val, width=bar_width, color=color, alpha=0.85, zorder=3)
+
+        # YoY annotation
+        if yoy_val is None:
+            label = "n/a"
+            label_color = "#999999"
+        else:
+            pct = yoy_val * 100
+            label = f"{pct:+.0f}%"
+            label_color = "#16a34a" if yoy_val >= 0 else "#dc2626"
+
+        # Position annotation above positive bars, below negative bars
+        if val >= 0:
+            y_pos = val
+            va = "bottom"
+            y_offset = 3
+        else:
+            y_pos = val
+            va = "top"
+            y_offset = -3
+
+        ax.annotate(
+            label,
+            (x[i], y_pos),
+            fontsize=6,
+            color=label_color,
+            fontweight="bold",
+            ha="center",
+            va=va,
+            xytext=(0, y_offset),
+            textcoords="offset points",
+            zorder=4,
+        )
 
 
 def _detect_axis_bounds(all_values: list[float]) -> tuple[float, float, list[tuple[int, float]]]:
@@ -224,32 +292,98 @@ def _create_line_chart(
 
 
 def _create_growth_chart(data: FundamentalData) -> str:
-    """Create growth metrics line chart (Revenue, EPS, FCF, EBITDA growth %)."""
+    """Create absolute value bar chart with EBITDA line overlay and YoY% annotations."""
     quarter_labels = [_format_quarter(q) for q in data.quarters]
 
-    metrics = {
-        "revenue": data.revenue_growth,
-        "eps": data.eps_growth,
-        "fcf": data.fcf_growth,
-        "ebitda": data.ebitda_growth,
-    }
+    revenue = data.revenue or [None] * len(data.quarters)
+    eps = data.eps or [None] * len(data.quarters)
+    ebitda = data.ebitda_values or [None] * len(data.quarters)
+    revenue_yoy = data.revenue_yoy or [None] * len(data.quarters)
+    eps_yoy = data.eps_yoy or [None] * len(data.quarters)
 
-    colors = {
-        "revenue": COLORS["revenue"],
-        "eps": COLORS["eps"],
-        "fcf": COLORS["fcf"],
-        "ebitda": COLORS["ebitda"],
-    }
+    # Check if we have any data at all
+    has_revenue = any(v is not None for v in revenue)
+    has_eps = any(v is not None for v in eps)
 
-    fig = _create_line_chart(
-        quarter_labels=quarter_labels,
-        metrics=metrics,
-        colors=colors,
-        title="Growth (QoQ)",
-        ylabel="Change %",
-        is_percentage=True,
+    if not has_revenue and not has_eps:
+        fig, ax = plt.subplots(figsize=(CHART_WIDTH, CHART_HEIGHT))
+        ax.text(0.5, 0.5, "No data available", ha="center", va="center",
+                transform=ax.transAxes, fontsize=9, color=COLORS["text"])
+        ax.set_xticks([])
+        ax.set_yticks([])
+        return _fig_to_base64(fig)
+
+    x = np.arange(len(quarter_labels))
+    fig, (ax_top, ax_bot) = plt.subplots(
+        2, 1, figsize=(CHART_WIDTH, CHART_HEIGHT), sharex=True,
+        gridspec_kw={"height_ratios": [1.2, 1], "hspace": 0.25},
     )
 
+    # --- Top subplot: Revenue bars + EBITDA line overlay ---
+    _draw_metric_bars(ax_top, x, revenue, revenue_yoy, COLORS["revenue"])
+    ax_top.set_ylabel("Revenue", fontsize=7, color=COLORS["text"])
+    ax_top.yaxis.set_major_formatter(plt.FuncFormatter(_format_revenue))
+    ax_top.tick_params(axis="y", labelsize=6, colors=COLORS["text"])
+
+    # EBITDA line on secondary Y-axis
+    has_ebitda = any(v is not None for v in ebitda)
+    if has_ebitda:
+        ax_ebitda = ax_top.twinx()
+        ebitda_plot = [v if v is not None else np.nan for v in ebitda]
+        ax_ebitda.plot(x, ebitda_plot, color=COLORS["ebitda"], linewidth=1.5,
+                       marker="o", markersize=3, label="EBITDA", zorder=5)
+        ax_ebitda.yaxis.set_major_formatter(plt.FuncFormatter(_format_revenue))
+        ax_ebitda.tick_params(axis="y", labelsize=6, colors=COLORS["ebitda"])
+        ax_ebitda.spines["right"].set_color(COLORS["ebitda"])
+        ax_ebitda.spines["top"].set_visible(False)
+        ax_ebitda.set_ylabel("EBITDA", fontsize=7, color=COLORS["ebitda"])
+
+    # Styling for top subplot
+    ax_top.yaxis.grid(True, color=COLORS["grid"], linewidth=0.5)
+    ax_top.set_axisbelow(True)
+    for spine in ["top", "right"]:
+        ax_top.spines[spine].set_visible(False)
+    for spine in ["bottom", "left"]:
+        ax_top.spines[spine].set_color(COLORS["grid"])
+    # Zero line if needed
+    y_lim = ax_top.get_ylim()
+    if y_lim[0] < 0 < y_lim[1]:
+        ax_top.axhline(y=0, color=COLORS["text"], linewidth=0.5)
+
+    # --- Bottom subplot: EPS bars ---
+    _draw_metric_bars(ax_bot, x, eps, eps_yoy, COLORS["eps"])
+    ax_bot.set_ylabel("EPS", fontsize=7, color=COLORS["text"])
+    ax_bot.yaxis.set_major_formatter(plt.FuncFormatter(_format_eps))
+    ax_bot.tick_params(axis="y", labelsize=6, colors=COLORS["text"])
+
+    # Styling for bottom subplot
+    ax_bot.yaxis.grid(True, color=COLORS["grid"], linewidth=0.5)
+    ax_bot.set_axisbelow(True)
+    for spine in ["top", "right"]:
+        ax_bot.spines[spine].set_visible(False)
+    for spine in ["bottom", "left"]:
+        ax_bot.spines[spine].set_color(COLORS["grid"])
+    # Zero line if needed
+    y_lim = ax_bot.get_ylim()
+    if y_lim[0] < 0 < y_lim[1]:
+        ax_bot.axhline(y=0, color=COLORS["text"], linewidth=0.5)
+
+    # X-axis labels only on bottom subplot
+    ax_bot.set_xticks(x)
+    ax_bot.set_xticklabels(quarter_labels, fontsize=7, color=COLORS["text"])
+
+    # Legend
+    from matplotlib.patches import Patch
+    from matplotlib.lines import Line2D
+    legend_elements = [Patch(facecolor=COLORS["revenue"], alpha=0.85, label="Revenue")]
+    if has_ebitda:
+        legend_elements.append(Line2D([0], [0], color=COLORS["ebitda"], linewidth=1.5,
+                                      marker="o", markersize=3, label="EBITDA"))
+    legend_elements.append(Patch(facecolor=COLORS["eps"], alpha=0.85, label="EPS"))
+    ax_bot.legend(handles=legend_elements, loc="upper center",
+                  bbox_to_anchor=(0.5, -0.2), ncol=3, fontsize=6, frameon=False)
+
+    fig.subplots_adjust(bottom=0.15)
     return _fig_to_base64(fig)
 
 
