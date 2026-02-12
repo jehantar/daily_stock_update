@@ -5,7 +5,9 @@ import finnhub
 import yfinance as yf
 import pandas as pd
 
-from src.fundamentals_fetcher import ensure_api_key, _fetch_sf1_data
+import nasdaqdatalink as ndl
+
+from src.fundamentals_fetcher import ensure_api_key, _fetch_sf1_data, _rate_limit, _chunked, TICKER_CHUNK_SIZE
 
 
 def _get_effective_today() -> datetime:
@@ -288,6 +290,91 @@ def _fetch_sharadar_actuals(symbols: list[str], earnings_dates: dict[str, dateti
     return results
 
 
+def _detect_recent_filings(symbols: list[str], days_back: int = 7) -> dict[str, dict]:
+    """Detect recently-filed quarterly reports via Sharadar SF1 datekey scan.
+
+    The datekey field is the date data was published to Sharadar, which closely
+    tracks actual filing dates. This catches earnings that Finnhub misses entirely.
+
+    Args:
+        symbols: List of ticker symbols
+        days_back: Number of days to scan back for recent filings
+
+    Returns:
+        Dict mapping symbol -> {datekey, calendardate, eps, revenue} for symbols
+        with recent quarterly filings.
+    """
+    if not symbols:
+        return {}
+
+    api_key = ensure_api_key()
+    today = _get_effective_today().date()
+    start_date = str(today - timedelta(days=days_back))
+    end_date = str(today)
+
+    # Map symbols to Sharadar tickers
+    sharadar_tickers = [_map_to_sharadar_ticker(s) for s in symbols]
+
+    print(f"  [Sharadar Pass 0] Scanning datekey {start_date} to {end_date} for recent filings...")
+
+    columns = ["ticker", "dimension", "calendardate", "datekey", "eps", "revenueusd"]
+    all_frames = []
+
+    for chunk in _chunked(sharadar_tickers, TICKER_CHUNK_SIZE):
+        try:
+            _rate_limit()
+            ndl.ApiConfig.api_key = api_key
+            df = ndl.get_table(
+                "SHARADAR/SF1",
+                paginate=True,
+                ticker=chunk,
+                dimension="MRQ",
+                datekey={"gte": start_date, "lte": end_date},
+                qopts={"columns": columns},
+            )
+            if not df.empty:
+                all_frames.append(df)
+        except Exception as e:
+            print(f"  [Sharadar Pass 0] Failed to fetch chunk: {e}")
+            continue
+
+    if not all_frames:
+        print("  [Sharadar Pass 0] No recent filings detected")
+        return {}
+
+    df = pd.concat(all_frames, ignore_index=True)
+    df = df[df["dimension"] == "MRQ"]
+    df["calendardate"] = pd.to_datetime(df["calendardate"])
+    df["datekey"] = pd.to_datetime(df["datekey"])
+
+    # For each symbol, take the most recent filing
+    results = {}
+    for symbol in symbols:
+        sharadar_ticker = _map_to_sharadar_ticker(symbol)
+        ticker_df = df[df["ticker"] == sharadar_ticker]
+        if ticker_df.empty:
+            continue
+
+        # Take the most recent filing by datekey
+        latest = ticker_df.sort_values("datekey").iloc[-1]
+        eps = _safe_float(latest.get("eps"))
+        revenue = _safe_float(latest.get("revenueusd"))
+
+        results[symbol] = {
+            "datekey": latest["datekey"].date(),
+            "calendardate": latest["calendardate"].date(),
+            "eps": eps,
+            "revenue": revenue,
+        }
+
+        rev_str = f"${revenue/1e9:.2f}B" if revenue else "N/A"
+        print(f"  [Sharadar Pass 0] {symbol}: filed {latest['datekey'].date()}, "
+              f"Q ending {latest['calendardate'].date()}, EPS={eps}, Rev={rev_str}")
+
+    print(f"  [Sharadar Pass 0] Detected {len(results)} recent filings")
+    return results
+
+
 def _fetch_yfinance_actuals(symbols: list[str], earnings_dates: dict[str, datetime]) -> dict[str, dict]:
     """Fetch actual EPS and revenue from yfinance for given symbols.
 
@@ -365,14 +452,21 @@ def _fetch_yfinance_actuals(symbols: list[str], earnings_dates: dict[str, dateti
 def get_earnings_calendar(symbols: list[str]) -> dict[str, EarningsEvent | None]:
     """Get next earnings date for each symbol.
 
-    Uses Finnhub for calendar dates/timing/estimates, but prefers Sharadar/SF1
-    for actual reported EPS and revenue. Falls back to yfinance, then Finnhub.
+    Flow:
+      Pass 0:   Sharadar datekey scan — detect recent filings (catches what Finnhub misses)
+      Pass 1:   Finnhub — upcoming earnings calendar + timing/estimates
+      Pass 1.5: Merge Sharadar detections for symbols Finnhub missed
+      Pass 2:   Sharadar actuals enrichment + fundamental context
+      Pass 3:   yfinance fallback
     """
     client = get_finnhub_client()
     today = _get_effective_today().date()
     results = {}
 
-    # First pass: get calendar data from Finnhub
+    # Pass 0: Sharadar datekey scan for recent filings
+    sharadar_filings = _detect_recent_filings(symbols)
+
+    # Pass 1: get calendar data from Finnhub
     for symbol in symbols:
         try:
             # Get earnings calendar for this symbol
@@ -453,7 +547,27 @@ def get_earnings_calendar(symbols: list[str]) -> dict[str, EarningsEvent | None]
         except Exception:
             results[symbol] = None
 
-    # Second pass: fetch Sharadar actuals for reported earnings (more reliable)
+    # Pass 1.5: Merge Sharadar-detected filings for symbols Finnhub missed
+    for symbol, filing in sharadar_filings.items():
+        existing = results.get(symbol)
+        # Only inject if Finnhub returned nothing or only has an upcoming event
+        if existing is None or existing.is_upcoming:
+            datekey = filing["datekey"]
+            print(f"  [Sharadar Pass 1.5] {symbol}: Finnhub missed this — "
+                  f"injecting from Sharadar (filed {datekey})")
+            results[symbol] = EarningsEvent(
+                symbol=symbol,
+                company_name=symbol,  # Will be enriched later if needed
+                date=datetime.combine(datekey, datetime.min.time()),
+                time="unknown",
+                eps_estimate=None,
+                revenue_estimate=None,
+                is_upcoming=False,
+                actual_eps=filing.get("eps"),
+                actual_revenue=filing.get("revenue"),
+            )
+
+    # Pass 2: fetch Sharadar actuals for reported earnings (more reliable)
     reported_symbols = [
         symbol for symbol, event in results.items()
         if event is not None and not event.is_upcoming
@@ -493,7 +607,7 @@ def get_earnings_calendar(symbols: list[str]) -> dict[str, EarningsEvent | None]
             if fundamental_context is not None:
                 event.fundamental_context = fundamental_context
 
-        # Third pass: try yfinance for symbols still missing data
+        # Pass 3: try yfinance for symbols still missing data
         symbols_needing_data = [
             symbol for symbol in reported_symbols
             if symbol not in sharadar_actuals
@@ -521,9 +635,14 @@ def get_earnings_calendar(symbols: list[str]) -> dict[str, EarningsEvent | None]
     return results
 
 
-def get_upcoming_earnings(symbols: list[str], days_ahead: int = 1) -> list[EarningsEvent]:
+def get_upcoming_earnings(
+    symbols: list[str],
+    days_ahead: int = 1,
+    calendar: dict[str, EarningsEvent | None] | None = None,
+) -> list[EarningsEvent]:
     """Get earnings events happening within the specified days."""
-    calendar = get_earnings_calendar(symbols)
+    if calendar is None:
+        calendar = get_earnings_calendar(symbols)
     today = _get_effective_today().date()
     target_date = today + timedelta(days=days_ahead)
 
@@ -537,9 +656,14 @@ def get_upcoming_earnings(symbols: list[str], days_ahead: int = 1) -> list[Earni
     return upcoming
 
 
-def get_recent_earnings(symbols: list[str], days_back: int = 1) -> list[EarningsEvent]:
+def get_recent_earnings(
+    symbols: list[str],
+    days_back: int = 1,
+    calendar: dict[str, EarningsEvent | None] | None = None,
+) -> list[EarningsEvent]:
     """Get earnings events that happened within the specified days."""
-    calendar = get_earnings_calendar(symbols)
+    if calendar is None:
+        calendar = get_earnings_calendar(symbols)
     today = _get_effective_today().date()
     cutoff_date = today - timedelta(days=days_back)
 
