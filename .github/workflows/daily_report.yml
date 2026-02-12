@@ -30,14 +30,25 @@ jobs:
       - name: Install dependencies
         run: pip install -r requirements.txt
 
+    - name: Load secrets from 1Password
+        uses: 1password/load-secrets-action@v2
+        with:
+          export-env: true
+        env:
+          OP_SERVICE_ACCOUNT_TOKEN: ${{ secrets.OP_SERVICE_ACCOUNT_TOKEN}}
+          # These will overwrite the variables for the next step
+          OPENAI_API_KEY: "op://Github actions- sentiment tracker/OpenAI/type"
+          NASDAQ_DATA_LINK_API_KEY: "op://Github actions- sentiment tracker/Nasdaq data link/type"
+
+
       - name: Run daily report
         env:
           GIST_URL: ${{ secrets.GIST_URL }}
           GMAIL_ADDRESS: ${{ secrets.GMAIL_ADDRESS }}
           GMAIL_APP_PASSWORD: ${{ secrets.GMAIL_APP_PASSWORD }}
-          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          OPENAI_API_KEY: ${{ env.OPENAI_API_KEY }}
           FINNHUB_API_KEY: ${{ secrets.FINNHUB_API_KEY }}
-          NASDAQ_DATA_LINK_API_KEY: ${{ secrets.NASDAQ_DATA_LINK_API_KEY }}
+          NASDAQ_DATA_LINK_API_KEY: ${{ env.NASDAQ_DATA_LINK_API_KEY }}
           REPORT_DATE: ${{ github.event.inputs.report_date }}
           PYTHONPATH: ${{ github.workspace }}
         run: python src/main.py
