@@ -36,8 +36,8 @@ jobs:
           export-env: true
         env:
           OP_SERVICE_ACCOUNT_TOKEN: ${{ secrets.OP_SERVICE_ACCOUNT_TOKEN }}
-          OPENAI_API_KEY: "op://Github actions- sentiment tracker/OpenAI/credential"
-          NASDAQ_DATA_LINK_API_KEY: "op://Github actions- sentiment tracker/Nasdaq data link/credential"
+          OPENAI_API_KEY: "op://Github actions stock email/OpenAI/credential"
+          NASDAQ_DATA_LINK_API_KEY: "op://Github actions stock email/Nasdaq data link/credential"
 
 
       - name: Run daily report
