@@ -162,6 +162,9 @@ def _get_custom_category(symbol: str) -> str:
         "MU": "Semiconductors, Hardware & Digital Infrastructure",
         "WDC": "Semiconductors, Hardware & Digital Infrastructure",
         "CLS": "Semiconductors, Hardware & Digital Infrastructure",
+        "AEIS": "Semiconductors, Hardware & Digital Infrastructure",
+        "CIEN": "Semiconductors, Hardware & Digital Infrastructure",
+        "LITE": "Semiconductors, Hardware & Digital Infrastructure",
         # Enterprise, Security & GovTech Software
         "CRWD": "Enterprise, Security & GovTech Software",
         "NET": "Enterprise, Security & GovTech Software",
@@ -181,6 +184,12 @@ def _get_custom_category(symbol: str) -> str:
         "NGD": "Resources, Materials & Life Sciences",
         "KRYS": "Resources, Materials & Life Sciences",
         "MEDP": "Resources, Materials & Life Sciences",
+        # Energy
+        "CNQ": "Energy",
+        "CQP": "Energy",
+        # Utilities & Infrastructure
+        "EIX": "Utilities & Infrastructure",
+        "FIX": "Utilities & Infrastructure",
     }
     return CATEGORIES.get(symbol.upper(), "Other")
 
@@ -193,6 +202,8 @@ CATEGORY_ORDER = [
     "Commerce, Marketplaces & Consumer Logistics",
     "Financials & Assets",
     "Resources, Materials & Life Sciences",
+    "Energy",
+    "Utilities & Infrastructure",
     "Other",
 ]
 
