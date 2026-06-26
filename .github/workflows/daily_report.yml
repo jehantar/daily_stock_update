@@ -1,0 +1,53 @@
+name: Daily Stock Report
+
+# Primary trigger: cron-job.org calls repository_dispatch at 3 PM PT weekdays
+# This is more reliable than GitHub's built-in schedule which can delay 10-60+ min
+on:
+  repository_dispatch:
+    types: [daily-report]
+  workflow_dispatch: # Allow manual trigger from GitHub UI
+    inputs:
+      report_date:
+        description: 'Simulate a specific date (YYYY-MM-DD). Leave empty for today.'
+        required: false
+        type: string
+
+jobs:
+  generate-report:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Load secrets from 1Password
+        uses: 1password/load-secrets-action@v2
+        with:
+          export-env: true
+        env:
+          OP_SERVICE_ACCOUNT_TOKEN: ${{ secrets.OP_SERVICE_ACCOUNT_TOKEN }}
+          OPENAI_API_KEY: "op://Github actions- sentiment tracker/OpenAI/credential"
+          NASDAQ_DATA_LINK_API_KEY: "op://Github actions- sentiment tracker/Nasdaq data link/credential"
+
+
+      - name: Run daily report
+        env:
+          GIST_URL: ${{ secrets.GIST_URL }}
+          GMAIL_ADDRESS: ${{ secrets.GMAIL_ADDRESS }}
+          GMAIL_APP_PASSWORD: ${{ secrets.GMAIL_APP_PASSWORD }}
+          OPENAI_API_KEY: ${{ env.OPENAI_API_KEY }}
+          FINNHUB_API_KEY: ${{ secrets.FINNHUB_API_KEY }}
+          NASDAQ_DATA_LINK_API_KEY: ${{ env.NASDAQ_DATA_LINK_API_KEY }}
+          REPORT_DATE: ${{ github.event.inputs.report_date }}
+          PYTHONPATH: ${{ github.workspace }}
+        run: python src/main.py
