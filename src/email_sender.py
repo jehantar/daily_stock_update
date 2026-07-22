@@ -156,20 +156,38 @@ def _get_custom_category(symbol: str) -> str:
         "AMZN": "Platform Technology & Digital Ecosystems",
         "NFLX": "Platform Technology & Digital Ecosystems",
         # Semiconductors, Hardware & Digital Infrastructure
+        "AAOI": "Semiconductors, Hardware & Digital Infrastructure",
+        "AMD": "Semiconductors, Hardware & Digital Infrastructure",
+        "ARM": "Semiconductors, Hardware & Digital Infrastructure",
+        "ASML": "Semiconductors, Hardware & Digital Infrastructure",
         "NVDA": "Semiconductors, Hardware & Digital Infrastructure",
         "AVGO": "Semiconductors, Hardware & Digital Infrastructure",
         "TSM": "Semiconductors, Hardware & Digital Infrastructure",
         "MU": "Semiconductors, Hardware & Digital Infrastructure",
         "WDC": "Semiconductors, Hardware & Digital Infrastructure",
+        "AXTI": "Semiconductors, Hardware & Digital Infrastructure",
         "CLS": "Semiconductors, Hardware & Digital Infrastructure",
         "AEIS": "Semiconductors, Hardware & Digital Infrastructure",
         "CIEN": "Semiconductors, Hardware & Digital Infrastructure",
+        "COHU": "Semiconductors, Hardware & Digital Infrastructure",
+        "DOCN": "Semiconductors, Hardware & Digital Infrastructure",
+        "INTC": "Semiconductors, Hardware & Digital Infrastructure",
+        "KLIC": "Semiconductors, Hardware & Digital Infrastructure",
         "LITE": "Semiconductors, Hardware & Digital Infrastructure",
+        "LRCX": "Semiconductors, Hardware & Digital Infrastructure",
+        "MRVL": "Semiconductors, Hardware & Digital Infrastructure",
+        "MXL": "Semiconductors, Hardware & Digital Infrastructure",
+        "SNDK": "Semiconductors, Hardware & Digital Infrastructure",
+        "STX": "Semiconductors, Hardware & Digital Infrastructure",
+        "TER": "Semiconductors, Hardware & Digital Infrastructure",
+        "TSEM": "Semiconductors, Hardware & Digital Infrastructure",
+        "VICR": "Semiconductors, Hardware & Digital Infrastructure",
         # Enterprise, Security & GovTech Software
         "CRWD": "Enterprise, Security & GovTech Software",
         "NET": "Enterprise, Security & GovTech Software",
         "AXON": "Enterprise, Security & GovTech Software",
         "APP": "Enterprise, Security & GovTech Software",
+        "BB": "Enterprise, Security & GovTech Software",
         # Commerce, Marketplaces & Consumer Logistics
         "MELI": "Commerce, Marketplaces & Consumer Logistics",
         "UBER": "Commerce, Marketplaces & Consumer Logistics",
@@ -177,6 +195,7 @@ def _get_custom_category(symbol: str) -> str:
         "BABA": "Commerce, Marketplaces & Consumer Logistics",
         # Financials & Assets
         "AMG": "Financials & Assets",
+        "PGC": "Financials & Assets",
         # Resources, Materials & Life Sciences
         "B": "Resources, Materials & Life Sciences",
         "EQX": "Resources, Materials & Life Sciences",
@@ -184,12 +203,16 @@ def _get_custom_category(symbol: str) -> str:
         "NGD": "Resources, Materials & Life Sciences",
         "KRYS": "Resources, Materials & Life Sciences",
         "MEDP": "Resources, Materials & Life Sciences",
+        "LLY": "Resources, Materials & Life Sciences",
+        "TWST": "Resources, Materials & Life Sciences",
         # Energy
         "CNQ": "Energy",
         "CQP": "Energy",
+        "TIGO": "Energy",
         # Utilities & Infrastructure
         "EIX": "Utilities & Infrastructure",
         "FIX": "Utilities & Infrastructure",
+        "AGX": "Utilities & Infrastructure",
     }
     return CATEGORIES.get(symbol.upper(), "Other")
 

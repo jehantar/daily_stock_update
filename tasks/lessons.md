@@ -22,3 +22,11 @@ Changed the priority order to:
 1. Past events with actual_eps (confirmed reported)
 2. Past events without actual_eps (reported but results pending in API)
 3. Nearest upcoming/future earnings (fallback)
+
+## 2026-07-21: Commit Scope Check
+
+### Issue
+The initial implementation commit omitted the owned plan file and recorded an intermediate commit SHA in the task tracker.
+
+### Lesson
+Before committing, compare the approved file list with both `git status --short` and the staged diff. After amending a commit, refresh any task records that cite its SHA.
