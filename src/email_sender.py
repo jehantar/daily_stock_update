@@ -177,11 +177,19 @@ def _get_custom_category(symbol: str) -> str:
         "VRT": "Semiconductors, Hardware & Digital Infrastructure",
         "WDC": "Semiconductors, Hardware & Digital Infrastructure",
         "CLS": "Semiconductors, Hardware & Digital Infrastructure",
+        "COHU": "Semiconductors, Hardware & Digital Infrastructure",
+        "KLIC": "Semiconductors, Hardware & Digital Infrastructure",
+        "MXL": "Semiconductors, Hardware & Digital Infrastructure",
+        "DOCN": "Semiconductors, Hardware & Digital Infrastructure",
+        "STX": "Semiconductors, Hardware & Digital Infrastructure",
+        "TER": "Semiconductors, Hardware & Digital Infrastructure",
+        "VICR": "Semiconductors, Hardware & Digital Infrastructure",
         # Enterprise, Security & GovTech Software
         "CRWD": "Enterprise, Security & GovTech Software",
         "NET": "Enterprise, Security & GovTech Software",
         "AXON": "Enterprise, Security & GovTech Software",
         "APP": "Enterprise, Security & GovTech Software",
+        "BB": "Enterprise, Security & GovTech Software",
         # Commerce, Marketplaces & Consumer Logistics
         "MELI": "Commerce, Marketplaces & Consumer Logistics",
         "UBER": "Commerce, Marketplaces & Consumer Logistics",
@@ -189,6 +197,7 @@ def _get_custom_category(symbol: str) -> str:
         "BABA": "Commerce, Marketplaces & Consumer Logistics",
         # Financials & Assets
         "AMG": "Financials & Assets",
+        "PGC": "Financials & Assets",
         # Resources, Materials & Life Sciences
         "B": "Resources, Materials & Life Sciences",
         "CNQ": "Resources, Materials & Life Sciences",
@@ -201,8 +210,12 @@ def _get_custom_category(symbol: str) -> str:
         "KRYS": "Resources, Materials & Life Sciences",
         "LLY": "Resources, Materials & Life Sciences",
         "MEDP": "Resources, Materials & Life Sciences",
+        "TWST": "Resources, Materials & Life Sciences",
         # Energy, Utilities & Infrastructure
         "EIX": "Energy, Utilities & Infrastructure",
+        "AGX": "Energy, Utilities & Infrastructure",
+        "FIX": "Energy, Utilities & Infrastructure",
+        "TIGO": "Energy, Utilities & Infrastructure",
     }
     return CATEGORIES.get(symbol.upper(), "Other")
 

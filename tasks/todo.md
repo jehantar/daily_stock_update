@@ -32,3 +32,35 @@ Decision: add `Energy, Utilities & Infrastructure` so utility holdings do not ge
   - `python3 -m unittest tests.test_data_fetcher`
   - `python3 -m unittest discover -s tests`
   - `python3 -m compileall src tests`
+
+# Match July 2026 Gist Tickers to Email Themes
+
+## Design Checklist
+
+- [x] Explore the current email category map, tests, project memory, and recent git state.
+- [x] Decide whether any design question needs a visual aid; none does.
+- [x] Confirm how to handle stocks that do not fit an existing theme cleanly.
+- [x] Compare the smallest viable mapping approaches and choose one.
+- [x] Present the proposed mapping and get approval.
+- [x] Write and review the approved design spec.
+- [x] Ask the user to review the written spec.
+- [x] Write the implementation plan.
+
+## Implementation Checklist
+
+- [x] Add a failing regression test for the approved ticker-to-theme mappings.
+- [x] Update the static category map in `src/email_sender.py`.
+- [x] Run focused and full test suites.
+- [x] Review the diff and record the results here.
+
+## Confirmed Design Choice
+
+- Keep `LINC` and `WLY` in `Other` rather than force them into an unrelated theme.
+
+## Implementation Results
+
+- RED: `python3 -m unittest tests.test_email_sender` exited 1 with 13 expected
+  failures for the newly mapped tickers; `LINC` and `WLY` passed as `Other`.
+- GREEN: `python3 -m unittest tests.test_email_sender` exited 0: 2 tests ran,
+  `OK`.
+- GREEN: `python3 -m unittest discover -s tests` exited 0: 4 tests ran, `OK`.
