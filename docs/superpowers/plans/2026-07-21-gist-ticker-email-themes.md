@@ -31,7 +31,7 @@
 
 - [x] **Step 1: Write the failing test**
 
-Create `tests/test_email_sender.py` with optional dependency stubs, an `EXPECTED_CATEGORIES` dictionary containing every ticker and theme from the design spec, a subtest for each mapping, and an exact assertion for the current eight-item `CATEGORY_ORDER` ending in `Other`.
+Create `tests/test_email_sender.py` with optional dependency stubs, an `EXPECTED_CATEGORIES` dictionary containing every ticker and theme from the design spec, a subtest for each mapping, and an exact assertion for the current nine-item `CATEGORY_ORDER` ending in `Other`.
 
 - [x] **Step 2: Verify the red state**
 
