@@ -7,5 +7,5 @@
 - [x] Update the static category map.
 - [x] Run focused and full test discovery. Both `python3 -m unittest tests.test_email_sender` and `python3 -m unittest discover -s tests` passed: 2 tests, `OK`.
 - [x] Review the diff and record results. `git diff --check` passed; the review found only the intended category map, regression test, and task tracking changes.
-- [x] Commit the clean integration change: `b051da1 Group tracked tickers by email theme`.
+- [x] Commit the clean integration change: `893e10c Group tracked tickers by email theme`.
 - [ ] Open, review, and merge the pull request into `main`.
