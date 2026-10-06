@@ -9,3 +9,10 @@
 - [x] Review the diff and record results. `git diff --check` passed; the review found only the intended category map, regression test, and task tracking changes.
 - [x] Commit the clean integration change: `893e10c Group tracked tickers by email theme`.
 - [x] Open, review, and merge pull request #8 into `main` as `3488b73`.
+
+# Group the Current 42-Stock Email List
+
+- [x] Review all new symbols against the existing themes and choose honest groups of at least three where possible. Seven active themes; only Life Sciences has two.
+- [x] Update the category map and its current-list test.
+- [x] Verify the focused and full test suites and review the diff. Three tests pass; the rendered table has all 42 tickers in theme order and no `Other` group.
+- [ ] Publish the code change so future reports use the new grouping; record the final result here.
