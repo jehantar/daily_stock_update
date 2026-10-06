@@ -27,3 +27,10 @@ Final review: The free replacement removes every runtime Sharadar and Nasdaq key
 - [x] Update the category map and its current-list test.
 - [x] Verify the focused and full test suites and review the diff. Three tests pass; the rendered table has all 42 tickers in theme order and no `Other` group.
 - [x] Publish the code change so future reports use the new grouping; PR #9 merged into `main` as `4990fb4`.
+
+# Split the Broad Hardware Email Theme
+
+- [x] Check the current 42-stock theme map and company descriptions for the less obvious names.
+- [x] Split the 19-stock group into four smaller groups and move DOCN to platform technology; keep each new active group at four or more stocks.
+- [x] Run the full test suite and inspect the rendered email table. All 23 tests pass, and the table renders 42 stock rows with the four new headings in order.
+- [ ] Publish the theme update and record the final result.
