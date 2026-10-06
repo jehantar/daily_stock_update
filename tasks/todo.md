@@ -16,5 +16,7 @@
 - [x] Fill quarterly charts and earnings context from free Yahoo statements, with explicit statement currency.
 - [x] Reuse each downloaded statement bundle for the chart and earnings write-up; avoid unsupported cross-source beat/miss comparisons.
 - [x] Remove the Nasdaq package and secret from the run, then update setup docs.
-- [x] Test missing-provider paths, mixed currencies, statement aliases, recent-report detection, and a report dry run. Seventeen tests passed; live AMD and TSM statements loaded, and TSM charts rendered.
-- [ ] Review and publish the migration in a separate pull request from the theme update.
+- [x] Test missing-provider paths, mixed currencies, statement aliases, recent-report detection, and a report dry run. Twenty-one tests passed; live AMD and TSM statements loaded, and TSM charts rendered.
+- [x] Review and publish the migration in draft PR #10, separate from the theme update in PR #9.
+
+Final review: The free replacement removes every runtime Sharadar and Nasdaq key reference. Finnhub keeps paired actual and estimate figures; Yahoo statements use their native currency, and Yahoo earnings dates fill recent Finnhub misses. A two-minute Yahoo lookup budget and a three-error stop keep a provider outage from delaying the email indefinitely. The owner waived the Claude review gate for these PRs. Local tests, compilation, and diff checks passed; a live scheduled email has not run yet.

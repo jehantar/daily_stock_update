@@ -1,4 +1,5 @@
 import os
+import time
 from datetime import datetime, timedelta
 import math
 from dataclasses import dataclass
@@ -68,6 +69,10 @@ def get_finnhub_client() -> finnhub.Client:
     return finnhub.Client(api_key=api_key)
 
 
+YAHOO_FALLBACK_BUDGET_SECONDS = 120
+YAHOO_FALLBACK_MAX_CONSECUTIVE_ERRORS = 3
+
+
 def _finite_float(value) -> float | None:
     """Return a finite number, or None for missing/invalid values."""
     try:
@@ -90,59 +95,62 @@ def _fetch_yahoo_earnings_event(symbol: str) -> EarningsEvent | None:
     # The report only includes earnings from the last two days. Older Yahoo
     # dates must not displace an imminent Finnhub reminder.
     cutoff = today - timedelta(days=2)
-    try:
-        dates = yf.Ticker(symbol).get_earnings_dates(limit=4)
-        if dates is None or dates.empty:
-            return None
-
-        candidates = []
-        for date_value, row in dates.iterrows():
-            event_date = _calendar_date(date_value)
-            reported_eps = _finite_float(row.get("Reported EPS"))
-            if cutoff <= event_date <= today or event_date > today:
-                candidates.append((event_date, reported_eps))
-
-        if not candidates:
-            return None
-
-        recent_reported = [
-            (date, eps) for date, eps in candidates
-            if date < today or (date == today and eps is not None)
-        ]
-        if recent_reported:
-            event_date, actual_eps = max(recent_reported, key=lambda event: event[0])
-            is_upcoming = False
-        else:
-            # A same-day row without Reported EPS remains pending. Otherwise,
-            # use the nearest future earnings date.
-            same_day_pending = [(date, eps) for date, eps in candidates if date == today]
-            event_date, actual_eps = same_day_pending[0] if same_day_pending else min(candidates, key=lambda event: event[0])
-            is_upcoming = True
-
-        return EarningsEvent(
-            symbol=symbol,
-            company_name=symbol,
-            date=datetime.combine(event_date, datetime.min.time()),
-            time="unknown",
-            eps_estimate=None,
-            revenue_estimate=None,
-            is_upcoming=is_upcoming,
-            actual_eps=actual_eps if not is_upcoming else None,
-            actual_revenue=None,
-        )
-    except Exception as exc:
-        print(f"  [Yahoo] Unable to get earnings date for {symbol}: {exc}")
+    dates = yf.Ticker(symbol).get_earnings_dates(limit=4)
+    if dates is None or dates.empty:
         return None
+
+    candidates = []
+    for date_value, row in dates.iterrows():
+        event_date = _calendar_date(date_value)
+        reported_eps = _finite_float(row.get("Reported EPS"))
+        if cutoff <= event_date <= today or event_date > today:
+            candidates.append((event_date, reported_eps))
+
+    if not candidates:
+        return None
+
+    recent_reported = [
+        (date, eps) for date, eps in candidates
+        if date < today or (date == today and eps is not None)
+    ]
+    if recent_reported:
+        event_date, actual_eps = max(recent_reported, key=lambda event: event[0])
+        is_upcoming = False
+    else:
+        # A same-day row without Reported EPS remains pending. Otherwise,
+        # use the nearest future earnings date.
+        same_day_pending = [(date, eps) for date, eps in candidates if date == today]
+        event_date, actual_eps = same_day_pending[0] if same_day_pending else min(candidates, key=lambda event: event[0])
+        is_upcoming = True
+
+    return EarningsEvent(
+        symbol=symbol,
+        company_name=symbol,
+        date=datetime.combine(event_date, datetime.min.time()),
+        time="unknown",
+        eps_estimate=None,
+        revenue_estimate=None,
+        is_upcoming=is_upcoming,
+        actual_eps=actual_eps if not is_upcoming else None,
+        actual_revenue=None,
+    )
 
 
 def get_earnings_calendar(symbols: list[str]) -> dict[str, EarningsEvent | None]:
     """Get Finnhub earnings dates, with Yahoo as a best-effort date fallback."""
-    client = get_finnhub_client()
+    try:
+        client = get_finnhub_client()
+    except Exception as exc:
+        print(f"  [Finnhub] Calendar unavailable: {exc}; checking Yahoo dates")
+        client = None
     today = _get_effective_today().date()
     results = {}
 
     # Finnhub supplies event dates, timing, estimates, and paired actuals.
     for symbol in symbols:
+        if client is None:
+            results[symbol] = None
+            continue
         try:
             earnings = client.earnings_calendar(
                 symbol=symbol,
@@ -177,7 +185,10 @@ def get_earnings_calendar(symbols: list[str]) -> dict[str, EarningsEvent | None]
 
             event_date = datetime.strptime(selected_event["date"], "%Y-%m-%d").date()
             actual_eps = selected_event.get("epsActual")
-            is_upcoming = not (event_date < today or (event_date == today and actual_eps is not None))
+            is_upcoming = not (
+                event_date < today or
+                (event_date == today and (actual_eps is not None or selected_event.get("revenueActual") is not None))
+            )
             results[symbol] = EarningsEvent(
                 symbol=symbol,
                 company_name=selected_event.get("symbol", symbol),
@@ -194,13 +205,27 @@ def get_earnings_calendar(symbols: list[str]) -> dict[str, EarningsEvent | None]
 
     # Yahoo is queried once per ticker only when Finnhub has no event or only
     # an upcoming event. It supplies dates and reported EPS status, not revenue.
+    fallback_started = time.monotonic()
+    consecutive_errors = 0
     for symbol in symbols:
         existing = results.get(symbol)
         has_finnhub_actuals = existing is not None and (
             existing.actual_eps is not None or existing.actual_revenue is not None
         )
         if (existing is None or existing.is_upcoming) and not has_finnhub_actuals:
-            yahoo_event = _fetch_yahoo_earnings_event(symbol)
+            if time.monotonic() - fallback_started >= YAHOO_FALLBACK_BUDGET_SECONDS:
+                print("  [Yahoo] Earnings-date fallback time budget reached; keeping Finnhub results")
+                break
+            try:
+                yahoo_event = _fetch_yahoo_earnings_event(symbol)
+                consecutive_errors = 0
+            except Exception as exc:
+                print(f"  [Yahoo] Unable to get earnings date for {symbol}: {exc}")
+                consecutive_errors += 1
+                if consecutive_errors >= YAHOO_FALLBACK_MAX_CONSECUTIVE_ERRORS:
+                    print("  [Yahoo] Earnings-date fallback paused after repeated errors")
+                    break
+                continue
             if yahoo_event is not None and (existing is None or not yahoo_event.is_upcoming):
                 print(f"  [Yahoo] {symbol}: using earnings date {yahoo_event.date.date()}")
                 results[symbol] = yahoo_event

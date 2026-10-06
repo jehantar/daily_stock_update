@@ -117,6 +117,18 @@ class EarningsTrackerTests(unittest.TestCase):
         self.assertEqual(event.eps_estimate, 1.2)
         self.assertEqual(event.revenue_estimate, 100.0)
 
+    def test_same_day_finnhub_revenue_actual_marks_reported(self):
+        same_day_event = {
+            **self.event,
+            "date": "2026-10-05",
+            "epsActual": None,
+        }
+        event, _, ticker_factory, _ = self.run_calendar([same_day_event])
+
+        self.assertFalse(event.is_upcoming)
+        self.assertEqual(event.actual_revenue, 105.0)
+        ticker_factory.assert_not_called()
+
     def test_old_yahoo_report_does_not_erase_finnhub_reminder(self):
         future_finnhub_event = {
             **self.event,
@@ -132,6 +144,44 @@ class EarningsTrackerTests(unittest.TestCase):
 
         self.assertEqual(event.date.date(), date(2026, 10, 6))
         self.assertEqual(event.eps_estimate, 1.2)
+
+    def test_missing_finnhub_key_uses_yahoo_dates(self):
+        yahoo_ticker = Mock()
+        yahoo_ticker.get_earnings_dates.return_value = EarningsDates([
+            (datetime(2026, 10, 4, tzinfo=timezone.utc), {"Reported EPS": 2.4}),
+        ])
+        with patch.dict(os.environ, self.env, clear=True), \
+                patch.object(tracker.yf, "Ticker", return_value=yahoo_ticker):
+            event = tracker.get_earnings_calendar(["ACME"])["ACME"]
+
+        self.assertFalse(event.is_upcoming)
+        self.assertEqual(event.date.date(), date(2026, 10, 4))
+
+    def test_repeated_yahoo_errors_stop_optional_lookup(self):
+        client = Mock()
+        client.earnings_calendar.return_value = {"earningsCalendar": []}
+        symbols = ["A", "B", "C", "D"]
+        with patch.dict(os.environ, self.env, clear=True), \
+                patch.object(tracker, "get_finnhub_client", return_value=client), \
+                patch.object(tracker.yf, "Ticker", side_effect=RuntimeError("Yahoo unavailable")) as ticker_factory:
+            results = tracker.get_earnings_calendar(symbols)
+
+        self.assertEqual(ticker_factory.call_count, 3)
+        self.assertEqual(results, {symbol: None for symbol in symbols})
+
+    def test_yahoo_time_budget_keeps_finnhub_calendar(self):
+        client = Mock()
+        client.earnings_calendar.return_value = {"earningsCalendar": []}
+        yahoo_ticker = Mock()
+        yahoo_ticker.get_earnings_dates.return_value = EarningsDates([])
+        with patch.dict(os.environ, self.env, clear=True), \
+                patch.object(tracker, "get_finnhub_client", return_value=client), \
+                patch.object(tracker.yf, "Ticker", return_value=yahoo_ticker) as ticker_factory, \
+                patch.object(tracker.time, "monotonic", side_effect=[0, 0, 121]):
+            results = tracker.get_earnings_calendar(["A", "B"])
+
+        ticker_factory.assert_called_once_with("A")
+        self.assertEqual(results, {"A": None, "B": None})
 
 
 if __name__ == "__main__":

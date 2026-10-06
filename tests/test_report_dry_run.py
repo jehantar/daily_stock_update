@@ -56,8 +56,7 @@ class ReportDryRunTests(unittest.TestCase):
             "send_daily_report": True,
         }
         with ExitStack() as stack:
-            stack.enter_context(patch.dict(os.environ, {"REPORT_DATE": "2026-10-05"}))
-            stack.enter_context(patch.dict(os.environ, {"NASDAQ_DATA_LINK_API_KEY": ""}))
+            stack.enter_context(patch.dict(os.environ, {"REPORT_DATE": "2026-10-05"}, clear=True))
             mocks = {
                 name: stack.enter_context(patch.object(report, name, return_value=value))
                 for name, value in replacements.items()
