@@ -30,3 +30,11 @@ The initial implementation commit omitted the owned plan file and recorded an in
 
 ### Lesson
 Before committing, compare the approved file list with both `git status --short` and the staged diff. After amending a commit, refresh any task records that cite its SHA.
+
+## 2026-10-05: Watchlist Changes Affect Email Themes
+
+### Issue
+After replacing the ticker Gist, the newly added stocks still fell under `Other` in the email's valuation table.
+
+### Lesson
+When changing a live watchlist, check every downstream use of those symbols. If the email groups stocks by a separate static map, update that map and its current-list test as part of the change. Keep existing themes where they fit and check the size of each active group.
