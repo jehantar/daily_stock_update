@@ -25,9 +25,9 @@ Automated daily stock monitoring system that analyzes portfolio movements, track
 - **Content**: Key metrics, guidance, notable quotes, market reaction
 
 ### 4. Fundamental Trends (Charts)
-- **Data Source**: Nasdaq Data Link SHARADAR/SF1 dataset
-- **History Depth**: 6 quarters
-- **Visualization**: Line charts with markers, embedded as CID attachments
+- **Data Source**: Yahoo Finance quarterly income, cash-flow, and balance statements
+- **History Depth**: Up to 6 quarters, depending on available statements
+- **Visualization**: Revenue, EBITDA, EPS, and profitability charts in the company's reporting currency, embedded as CID attachments
 - **Outlier Handling**: IQR-based detection with axis capping and value annotations
 
 ### 5. Valuation Snapshot
@@ -45,13 +45,14 @@ Automated daily stock monitoring system that analyzes portfolio movements, track
 │  (CSV tickers)  │     │  (Python script) │     │  (Daily email)  │
 └─────────────────┘     └────────┬─────────┘     └─────────────────┘
                                 │
-                   ┌────────────┼────────────┬────────────┐
-                   ▼            ▼            ▼            ▼
-             ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌──────────┐
-             │ Yahoo    │ │ Finnhub  │ │ OpenAI   │ │ Nasdaq   │
-             │ Finance  │ │ API      │ │ API      │ │ Data Link│
-             │ (prices) │ │(earnings)│ │ (AI)     │ │(fundmtls)│
-             └──────────┘ └──────────┘ └──────────┘ └──────────┘
+                   ┌────────────┼────────────┐
+                   ▼            ▼            ▼
+             ┌──────────┐ ┌──────────┐ ┌──────────┐
+             │ Yahoo    │ │ Finnhub  │ │ OpenAI   │
+             │ Finance  │ │ API      │ │ API      │
+             │(prices + │ │(earnings)│ │ (AI)     │
+             │fundmtls) │ │          │ │          │
+             └──────────┘ └──────────┘ └──────────┘
 ```
 
 ---
@@ -113,24 +114,25 @@ Automated daily stock monitoring system that analyzes portfolio movements, track
 
 ### Metrics
 
-**Growth Chart (QoQ % change)**
+**Growth Chart (quarterly values with YoY change labels)**
 | Metric | Source Field | Color |
 |--------|--------------|-------|
-| Revenue | `revenueusd` | Blue (#3b82f6) |
-| EPS | `eps` | Green (#16a34a) |
-| Free Cash Flow | `fcf` | Amber (#f59e0b) |
+| Revenue | Yahoo quarterly Total Revenue | Blue (#3b82f6) |
+| EBITDA | Yahoo quarterly EBITDA | Red (#ef4444) |
+| EPS | Yahoo quarterly Diluted EPS, then Basic EPS | Green (#16a34a) |
 
 **Profitability Chart (absolute %)**
 | Metric | Source Field | Color |
 |--------|--------------|-------|
-| ROE | `roe` | Purple (#8b5cf6) |
-| ROA | `roa` | Cyan (#06b6d4) |
-| Gross Margin | `grossmargin` | Teal (#14b8a6) |
-| Net Margin | `netmargin` | Pink (#ec4899) |
+| ROE | Trailing-four-quarter net income / average equity | Purple (#8b5cf6) |
+| ROA | Trailing-four-quarter net income / average assets | Cyan (#06b6d4) |
+| Gross Margin | Gross Profit / Revenue | Teal (#14b8a6) |
+| Net Margin | Net Income / Revenue | Pink (#ec4899) |
+| Operating Margin | Operating Income / Revenue | Orange (#f97316) |
 
 ### Chart Configuration
-- **Size**: 3.2 × 2.0 inches at 120 DPI
-- **Type**: Line chart with circular markers
+- **Size**: 3.2 × 3.0 inches at 120 DPI
+- **Type**: Growth bars and profitability lines
 - **Grid**: Horizontal and vertical gridlines
 - **Legend**: Positioned below chart
 
@@ -178,7 +180,7 @@ Instructions:
 ## Infrastructure
 
 ### GitHub Actions Workflow
-- **Schedule**: `cron: '0 23 * * 1-5'` (3 PM Pacific on weekdays)
+- **Schedule**: External weekday `repository_dispatch`; manual `workflow_dispatch` is also available
 - **Runner**: `ubuntu-latest`
 - **Timeout**: 10 minutes
 
@@ -190,15 +192,13 @@ Instructions:
 | `GMAIL_APP_PASSWORD` | Gmail App Password (not regular password) |
 | `OPENAI_API_KEY` | OpenAI API key |
 | `FINNHUB_API_KEY` | Finnhub API key (free) |
-| `NASDAQ_DATA_LINK_API_KEY` | Nasdaq Data Link API key (SHARADAR subscription) |
 
-### API Rate Limits
-| Service | Limit | Our Usage |
-|---------|-------|-----------|
-| Yahoo Finance | Unofficial, ~2000/hr | ~50-100 calls/day |
-| Finnhub | 60 calls/min | ~50-100 calls/day |
-| OpenAI | Pay per token | ~10-50 calls/day |
-| Nasdaq Data Link | Varies by plan | ~2-4 calls/day |
+### Data access
+| Service | Role | Handling |
+|---------|------|----------|
+| Yahoo Finance | Prices, valuation, quarterly statements | Unofficial interface; missing statements leave charts or notes blank |
+| Finnhub | Earnings dates, estimates, reported actuals, news | Existing API key; calendar remains usable without Nasdaq access |
+| OpenAI | News and earnings summaries | Existing API key; billed by provider |
 
 ---
 
@@ -220,12 +220,6 @@ Instructions:
 1. Register at https://finnhub.io/register
 2. Copy API key from dashboard
 3. Save as `FINNHUB_API_KEY` secret
-
-### Nasdaq Data Link API Key
-1. Register at https://data.nasdaq.com
-2. Subscribe to SHARADAR Core US Fundamentals (SF1)
-3. Copy API key from account settings (20 characters)
-4. Save as `NASDAQ_DATA_LINK_API_KEY` secret
 
 ### GitHub Secrets Setup
 1. Go to your repo → Settings → Secrets and variables → Actions
@@ -259,7 +253,8 @@ sentiment_tracker/
 │   ├── earnings_tracker.py       # Earnings calendar logic
 │   ├── news_aggregator.py        # Multi-source news gathering
 │   ├── ai_analyzer.py            # OpenAI API integration
-│   ├── fundamentals_fetcher.py   # Nasdaq Data Link integration
+│   ├── fundamentals_fetcher.py   # Yahoo Finance quarterly statements
+│   ├── earnings_enrichment.py    # Attach matched statement context
 │   ├── chart_generator.py        # matplotlib chart generation
 │   └── email_sender.py           # Gmail SMTP with CID images
 ├── requirements.txt              # Python dependencies
@@ -278,7 +273,6 @@ finnhub-python>=2.4.18    # Finnhub API client
 openai>=1.0.0             # OpenAI API
 beautifulsoup4>=4.12      # HTML parsing for news
 python-dateutil>=2.8      # Date handling
-nasdaq-data-link>=1.0.0   # Nasdaq Data Link API
 matplotlib>=3.7.0         # Chart generation
 pandas>=2.0.0             # Data manipulation
 numpy>=1.24.0             # Numerical operations

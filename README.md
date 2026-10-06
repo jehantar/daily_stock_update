@@ -40,11 +40,6 @@ Create a CSV with your stock tickers. The system reads tickers from column C (in
 1. Register at [finnhub.io](https://finnhub.io/register)
 2. Copy API key from dashboard
 
-#### Nasdaq Data Link API Key
-1. Register at [data.nasdaq.com](https://data.nasdaq.com)
-2. Subscribe to SHARADAR/SF1 dataset
-3. Copy API key from account settings
-
 ### 4. Configure GitHub Secrets
 
 1. Create a new GitHub repository
@@ -59,11 +54,10 @@ Create a CSV with your stock tickers. The system reads tickers from column C (in
 | `GMAIL_APP_PASSWORD` | The 16-character app password |
 | `OPENAI_API_KEY` | Your OpenAI API key |
 | `FINNHUB_API_KEY` | Your Finnhub API key |
-| `NASDAQ_DATA_LINK_API_KEY` | Your Nasdaq Data Link API key |
 
 ### 5. Enable GitHub Actions
 
-The workflow runs automatically at 3 PM Pacific on weekdays.
+The workflow is triggered on weekdays by the configured external scheduler. It can also be run manually.
 
 To test manually:
 1. Go to Actions tab
@@ -86,20 +80,22 @@ The email includes:
 
 ## Fundamental Trends Charts
 
-Each ticker includes two line charts showing 6 quarters of history:
+Stocks with a recent earnings report can include two charts with up to 6 quarters of Yahoo Finance statement history:
 
 **Growth Chart**
-- Revenue growth (QoQ %)
-- EPS growth (QoQ %)
-- Free Cash Flow growth (QoQ %)
+- Quarterly revenue, EBITDA, and EPS in the company's reporting currency
+- Revenue and EPS year-over-year changes where history is available
 
 **Profitability Chart**
 - Return on Equity (ROE %)
 - Return on Assets (ROA %)
 - Gross Margin %
 - Net Margin %
+- Operating Margin % where available
 
-Charts include smart axis scaling - extreme outliers are capped with annotations showing actual values.
+Missing statement fields are left blank. Charts include smart axis scaling - extreme outliers are capped with annotations showing actual values.
+
+Finnhub supplies earnings dates, estimates, and reported actuals. Yahoo Finance supplies the quarterly statements used for charts and trend notes. The report keeps those sources separate when it compares actuals with estimates, since statement currency and share basis can differ. Yahoo earnings dates may flag a recent report missing from Finnhub, but this is a best-effort check. Yahoo Finance data comes through an unofficial interface, so statement coverage and timing can vary.
 
 ## Local Development
 
@@ -113,7 +109,6 @@ export GMAIL_ADDRESS="you@gmail.com"
 export GMAIL_APP_PASSWORD="xxxx xxxx xxxx xxxx"
 export OPENAI_API_KEY="sk-..."
 export FINNHUB_API_KEY="..."
-export NASDAQ_DATA_LINK_API_KEY="..."
 
 # Run
 python src/main.py
@@ -131,7 +126,7 @@ sentiment_tracker/
 │   ├── earnings_tracker.py   # Finnhub earnings calendar
 │   ├── news_aggregator.py    # Multi-source news
 │   ├── ai_analyzer.py        # OpenAI gpt-5-mini integration
-│   ├── fundamentals_fetcher.py  # Nasdaq Data Link fundamentals
+│   ├── fundamentals_fetcher.py  # Yahoo Finance quarterly statements
 │   ├── chart_generator.py    # matplotlib line charts
 │   └── email_sender.py       # Gmail SMTP with embedded images
 ├── requirements.txt
@@ -155,9 +150,8 @@ sentiment_tracker/
 - Some smaller stocks may not have earnings calendar data
 
 **Charts not rendering?**
-- Verify Nasdaq Data Link API key is valid (20 characters)
-- Check you have SHARADAR/SF1 subscription active
-- Charts require at least 2 quarters of data
+- Yahoo Finance may not have current quarterly statements for every stock
+- Charts require at least 2 quarters of data and a statement matching the recent report
 
 **Charts showing broken images?**
 - Gmail blocks data URIs; we use CID attachments which should work

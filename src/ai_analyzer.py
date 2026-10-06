@@ -104,10 +104,11 @@ def analyze_earnings_report(
         diff_pct = ((event.actual_revenue - event.revenue_estimate) / event.revenue_estimate) * 100 if event.revenue_estimate != 0 else 0
         revenue_info = f"Revenue: ${rev_b:.2f}B actual vs ${est_b:.2f}B expected ({beat_miss} by {abs(diff_pct):.1f}%)"
 
-    # Build fundamental trends section from Sharadar data
+    # Build statement trends from Yahoo Finance data in the reporting currency.
     fundamental_trends = ""
     ctx = event.fundamental_context
     if ctx:
+        currency = ctx.financial_currency or "currency not reported"
         # QoQ trends
         qoq_trends = []
         if ctx.revenue_qoq_change is not None:
@@ -132,12 +133,16 @@ def analyze_earnings_report(
 
         # Absolute values with context
         absolutes = []
+        if ctx.revenue is not None:
+            absolutes.append(f"Statement Revenue: {ctx.revenue / 1e9:.2f}B {currency}")
+        if ctx.eps is not None:
+            absolutes.append(f"Statement EPS: {ctx.eps:.2f} {currency} per reported share")
         if ctx.fcf is not None:
             fcf_b = ctx.fcf / 1e9
-            absolutes.append(f"Free Cash Flow: ${fcf_b:.2f}B")
+            absolutes.append(f"Free Cash Flow: {fcf_b:.2f}B {currency}")
         if ctx.capex is not None:
-            capex_b = abs(ctx.capex) / 1e9
-            absolutes.append(f"CapEx: ${capex_b:.2f}B")
+            capex_b = ctx.capex / 1e9
+            absolutes.append(f"CapEx: {capex_b:.2f}B {currency}")
 
         # Margins with QoQ and YoY comparison
         margins = []
@@ -183,7 +188,11 @@ def analyze_earnings_report(
             sections.append("Margins:\n" + "\n".join(f"- {t}" for t in margins))
 
         if sections:
-            fundamental_trends = "\n\n".join(sections)
+            fundamental_trends = (
+                f"Yahoo quarterly statements ({currency}). Do not compare these figures "
+                "with Finnhub estimates; reporting currency and share basis can differ.\n\n"
+                + "\n\n".join(sections)
+            )
 
     prompt = f"""Provide a comprehensive earnings analysis for {event.symbol} ({event.company_name}).
 
@@ -217,7 +226,8 @@ Instructions:
 - For ANALYST REACTIONS: Synthesize from the news coverage provided. Look for mentions of analyst ratings, price targets, upgrades, downgrades, or Wall Street sentiment. If the news mentions analyst commentary even indirectly, include it.
 - For FORWARD OUTLOOK: Extract any forward-looking statements, guidance, or expectations mentioned in the news. Include management commentary on future quarters if available.
 - For KEY QUOTES: Only include actual direct quotes found in the coverage. Do not fabricate quotes.
-- Every section except KEY QUOTES must have substantive content. Use the earnings results data and news context to provide analysis even when coverage is limited.
+- Use only the figures and coverage supplied above. A calendar date alone does not confirm reported results.
+- If a section lacks verified information, say that current coverage does not provide it. Do not infer a beat or miss from Yahoo statements and Finnhub estimates.
 - Focus on what investors care about most
 - Do not use markdown formatting beyond the section headers above
 - Write in a professional, concise style"""

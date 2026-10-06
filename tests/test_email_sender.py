@@ -1,3 +1,4 @@
+import importlib.util
 import sys
 import types
 import unittest
@@ -8,10 +9,10 @@ sys.modules.setdefault("yfinance", types.ModuleType("yfinance"))
 finnhub = types.ModuleType("finnhub")
 finnhub.Client = object
 sys.modules.setdefault("finnhub", finnhub)
-sys.modules.setdefault("nasdaqdatalink", types.ModuleType("nasdaqdatalink"))
-chart_generator = types.ModuleType("src.chart_generator")
-chart_generator.ChartPair = object
-sys.modules.setdefault("src.chart_generator", chart_generator)
+if importlib.util.find_spec("matplotlib") is None:
+    chart_generator = types.ModuleType("src.chart_generator")
+    chart_generator.ChartPair = object
+    sys.modules.setdefault("src.chart_generator", chart_generator)
 
 from src.email_sender import CATEGORY_ORDER, _get_custom_category
 

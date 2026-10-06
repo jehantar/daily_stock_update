@@ -37,7 +37,6 @@ jobs:
         env:
           OP_SERVICE_ACCOUNT_TOKEN: ${{ secrets.OP_SERVICE_ACCOUNT_TOKEN }}
           OPENAI_API_KEY: "op://Github actions stock email/OpenAI/credential"
-          NASDAQ_DATA_LINK_API_KEY: "op://Github actions stock email/Nasdaq data link/credential"
 
 
       - name: Run daily report
@@ -47,7 +46,6 @@ jobs:
           GMAIL_APP_PASSWORD: ${{ secrets.GMAIL_APP_PASSWORD }}
           OPENAI_API_KEY: ${{ env.OPENAI_API_KEY }}
           FINNHUB_API_KEY: ${{ secrets.FINNHUB_API_KEY }}
-          NASDAQ_DATA_LINK_API_KEY: ${{ env.NASDAQ_DATA_LINK_API_KEY }}
           REPORT_DATE: ${{ github.event.inputs.report_date }}
           PYTHONPATH: ${{ github.workspace }}
         run: python src/main.py
