@@ -25,6 +25,7 @@ from src.ai_analyzer import analyze_price_movement, analyze_earnings_report
 from src.email_sender import send_daily_report
 from src.fundamentals_fetcher import fetch_fundamentals
 from src.chart_generator import generate_all_charts
+from src.earnings_enrichment import attach_fundamental_context
 
 
 def _get_effective_today() -> datetime:
@@ -107,17 +108,25 @@ def main():
     earnings_with_dates = sum(1 for e in all_earnings.values() if e and e.is_upcoming)
     print(f"Upcoming earnings: {len(upcoming_earnings)}, Recent reports: {len(recent_earnings)}, Scheduled: {earnings_with_dates}")
 
-    # Step 5: Fetch fundamental data and generate charts (only for recent earnings)
+    # Step 5: Fetch fundamentals once for recent reports, then reuse them for
+    # the earnings write-up and charts.
     fundamental_charts = {}
     if recent_earnings:
         recent_symbols = [e.symbol for e in recent_earnings]
-        print(f"Fetching fundamental data for {len(recent_symbols)} tickers with recent earnings...")
+        print(f"Fetching quarterly data for {len(recent_symbols)} tickers with recent earnings...")
         try:
             fundamentals = fetch_fundamentals(recent_symbols, company_names, quarters=6)
             print(f"  Retrieved fundamentals for {len(fundamentals)} tickers")
 
             print("Generating fundamental charts...")
-            fundamental_charts = generate_all_charts(fundamentals)
+            current_fundamentals = {}
+            for event in recent_earnings:
+                data = fundamentals.get(event.symbol)
+                if data and attach_fundamental_context(event, data):
+                    current_fundamentals[event.symbol] = data
+                else:
+                    print(f"  {event.symbol}: no statement matching the recent report")
+            fundamental_charts = generate_all_charts(current_fundamentals)
             print(f"  Generated {len(fundamental_charts)} chart pairs")
         except Exception as e:
             print(f"  Warning: Failed to fetch/generate fundamentals: {e}")

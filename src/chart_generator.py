@@ -70,24 +70,26 @@ def _fig_to_base64(fig: plt.Figure) -> str:
     return img_base64
 
 
-def _format_revenue(value: float, _pos=None) -> str:
-    """Format revenue values for Y-axis ($50B, $500M, etc.)."""
+def _format_revenue(value: float, _pos=None, currency: str | None = "USD") -> str:
+    """Format revenue and EBITDA values with the reporting currency."""
+    prefix = "$" if currency and currency.upper() == "USD" else (f"{currency.upper()} " if currency else "")
     abs_val = abs(value)
     if abs_val >= 1e12:
-        return f"${value / 1e12:.1f}T"
+        return f"{prefix}{value / 1e12:.1f}T"
     elif abs_val >= 1e9:
-        return f"${value / 1e9:.0f}B"
+        return f"{prefix}{value / 1e9:.0f}B"
     elif abs_val >= 1e6:
-        return f"${value / 1e6:.0f}M"
+        return f"{prefix}{value / 1e6:.0f}M"
     elif abs_val >= 1e3:
-        return f"${value / 1e3:.0f}K"
+        return f"{prefix}{value / 1e3:.0f}K"
     else:
-        return f"${value:.0f}"
+        return f"{prefix}{value:.0f}"
 
 
-def _format_eps(value: float, _pos=None) -> str:
-    """Format EPS values for Y-axis ($1.25)."""
-    return f"${value:.2f}"
+def _format_eps(value: float, _pos=None, currency: str | None = "USD") -> str:
+    """Format EPS values using the reporting currency."""
+    prefix = "$" if currency and currency.upper() == "USD" else (f"{currency.upper()} " if currency else "")
+    return f"{prefix}{value:.2f}"
 
 
 def _draw_metric_bars(
@@ -322,7 +324,8 @@ def _create_growth_chart(data: FundamentalData) -> str:
     # --- Top subplot: Revenue bars + EBITDA line overlay ---
     _draw_metric_bars(ax_top, x, revenue, revenue_yoy, COLORS["revenue"])
     ax_top.set_ylabel("Revenue", fontsize=7, color=COLORS["text"])
-    ax_top.yaxis.set_major_formatter(plt.FuncFormatter(_format_revenue))
+    currency = getattr(data, "financial_currency", None)
+    ax_top.yaxis.set_major_formatter(plt.FuncFormatter(lambda value, pos: _format_revenue(value, pos, currency)))
     ax_top.tick_params(axis="y", labelsize=6, colors=COLORS["text"])
 
     # EBITDA line on secondary Y-axis
@@ -332,7 +335,9 @@ def _create_growth_chart(data: FundamentalData) -> str:
         ebitda_plot = [v if v is not None else np.nan for v in ebitda]
         ax_ebitda.plot(x, ebitda_plot, color=COLORS["ebitda"], linewidth=1.5,
                        marker="o", markersize=3, label="EBITDA", zorder=5)
-        ax_ebitda.yaxis.set_major_formatter(plt.FuncFormatter(_format_revenue))
+        ax_ebitda.yaxis.set_major_formatter(
+            plt.FuncFormatter(lambda value, pos: _format_revenue(value, pos, currency))
+        )
         ax_ebitda.tick_params(axis="y", labelsize=6, colors=COLORS["ebitda"])
         ax_ebitda.spines["right"].set_color(COLORS["ebitda"])
         ax_ebitda.spines["top"].set_visible(False)
@@ -353,7 +358,7 @@ def _create_growth_chart(data: FundamentalData) -> str:
     # --- Bottom subplot: EPS bars ---
     _draw_metric_bars(ax_bot, x, eps, eps_yoy, COLORS["eps"])
     ax_bot.set_ylabel("EPS", fontsize=7, color=COLORS["text"])
-    ax_bot.yaxis.set_major_formatter(plt.FuncFormatter(_format_eps))
+    ax_bot.yaxis.set_major_formatter(plt.FuncFormatter(lambda value, pos: _format_eps(value, pos, currency)))
     ax_bot.tick_params(axis="y", labelsize=6, colors=COLORS["text"])
 
     # Styling for bottom subplot
