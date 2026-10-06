@@ -24,30 +24,30 @@ NTNX NVDA PAYS PSX PRLB SNDK STX SMTC TSM TGTX TSEM TWLO UBER VLO WMT""".split()
 
 EXPECTED_CATEGORIES = {
     "AMZN": "Platform Technology & Digital Ecosystems",
+    "DOCN": "Platform Technology & Digital Ecosystems",
     "GOOG": "Platform Technology & Digital Ecosystems",
     "META": "Platform Technology & Digital Ecosystems",
     "MGNI": "Platform Technology & Digital Ecosystems",
     "MSFT": "Platform Technology & Digital Ecosystems",
     "NFLX": "Platform Technology & Digital Ecosystems",
-    "AAOI": "Semiconductors, Hardware & Digital Infrastructure",
-    "AMD": "Semiconductors, Hardware & Digital Infrastructure",
-    "ARM": "Semiconductors, Hardware & Digital Infrastructure",
-    "AVGO": "Semiconductors, Hardware & Digital Infrastructure",
-    "AXTI": "Semiconductors, Hardware & Digital Infrastructure",
-    "COHR": "Semiconductors, Hardware & Digital Infrastructure",
-    "DOCN": "Semiconductors, Hardware & Digital Infrastructure",
-    "INTC": "Semiconductors, Hardware & Digital Infrastructure",
-    "LITE": "Semiconductors, Hardware & Digital Infrastructure",
-    "MRVL": "Semiconductors, Hardware & Digital Infrastructure",
-    "MU": "Semiconductors, Hardware & Digital Infrastructure",
-    "NTAP": "Semiconductors, Hardware & Digital Infrastructure",
-    "NVDA": "Semiconductors, Hardware & Digital Infrastructure",
-    "PRLB": "Semiconductors, Hardware & Digital Infrastructure",
-    "SMTC": "Semiconductors, Hardware & Digital Infrastructure",
-    "SNDK": "Semiconductors, Hardware & Digital Infrastructure",
-    "STX": "Semiconductors, Hardware & Digital Infrastructure",
-    "TSM": "Semiconductors, Hardware & Digital Infrastructure",
-    "TSEM": "Semiconductors, Hardware & Digital Infrastructure",
+    "AMD": "Chip Design & IP",
+    "ARM": "Chip Design & IP",
+    "AVGO": "Chip Design & IP",
+    "MRVL": "Chip Design & IP",
+    "NVDA": "Chip Design & IP",
+    "SMTC": "Chip Design & IP",
+    "INTC": "Manufacturing & Chip Foundries",
+    "PRLB": "Manufacturing & Chip Foundries",
+    "TSM": "Manufacturing & Chip Foundries",
+    "TSEM": "Manufacturing & Chip Foundries",
+    "AAOI": "Optical Networks & Materials",
+    "AXTI": "Optical Networks & Materials",
+    "COHR": "Optical Networks & Materials",
+    "LITE": "Optical Networks & Materials",
+    "MU": "Memory & Data Storage",
+    "NTAP": "Memory & Data Storage",
+    "SNDK": "Memory & Data Storage",
+    "STX": "Memory & Data Storage",
     "AXON": "Enterprise, Security & GovTech Software",
     "CRWD": "Enterprise, Security & GovTech Software",
     "NET": "Enterprise, Security & GovTech Software",
@@ -67,6 +67,20 @@ EXPECTED_CATEGORIES = {
     "VLO": "Energy",
 }
 
+LEGACY_HARDWARE_CATEGORIES = {
+    "AEIS": "Manufacturing & Chip Foundries",
+    "ASML": "Manufacturing & Chip Foundries",
+    "CIEN": "Optical Networks & Materials",
+    "CLS": "Manufacturing & Chip Foundries",
+    "COHU": "Manufacturing & Chip Foundries",
+    "KLIC": "Manufacturing & Chip Foundries",
+    "LRCX": "Manufacturing & Chip Foundries",
+    "MXL": "Chip Design & IP",
+    "TER": "Manufacturing & Chip Foundries",
+    "VICR": "Manufacturing & Chip Foundries",
+    "WDC": "Memory & Data Storage",
+}
+
 
 class EmailSenderCategoryTests(unittest.TestCase):
     def test_current_watchlist_has_complete_theme_coverage(self) -> None:
@@ -75,6 +89,11 @@ class EmailSenderCategoryTests(unittest.TestCase):
         self.assertEqual(set(EXPECTED_CATEGORIES), set(CURRENT_TICKERS))
         counts = Counter(_get_custom_category(symbol) for symbol in CURRENT_TICKERS)
         self.assertNotIn("Other", counts)
+        self.assertNotIn("Semiconductors, Hardware & Digital Infrastructure", counts)
+        self.assertEqual(counts["Chip Design & IP"], 6)
+        self.assertEqual(counts["Manufacturing & Chip Foundries"], 4)
+        self.assertEqual(counts["Optical Networks & Materials"], 4)
+        self.assertEqual(counts["Memory & Data Storage"], 4)
         self.assertEqual(counts["Resources, Materials & Life Sciences"], 2)
         self.assertTrue(all(count >= 3 for category, count in counts.items()
                             if category != "Resources, Materials & Life Sciences"))
@@ -84,12 +103,20 @@ class EmailSenderCategoryTests(unittest.TestCase):
             with self.subTest(symbol=symbol):
                 self.assertEqual(_get_custom_category(symbol), expected_category)
 
+    def test_legacy_hardware_tickers_use_the_split_themes(self) -> None:
+        for symbol, expected_category in LEGACY_HARDWARE_CATEGORIES.items():
+            with self.subTest(symbol=symbol):
+                self.assertEqual(_get_custom_category(symbol), expected_category)
+
     def test_category_order_stays_unchanged(self) -> None:
         self.assertEqual(
             CATEGORY_ORDER,
             [
                 "Platform Technology & Digital Ecosystems",
-                "Semiconductors, Hardware & Digital Infrastructure",
+                "Chip Design & IP",
+                "Manufacturing & Chip Foundries",
+                "Optical Networks & Materials",
+                "Memory & Data Storage",
                 "Enterprise, Security & GovTech Software",
                 "Commerce, Marketplaces & Consumer Logistics",
                 "Financials & Assets",

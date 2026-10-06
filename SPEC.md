@@ -33,7 +33,7 @@ Automated daily stock monitoring system that analyzes portfolio movements, track
 ### 5. Valuation Snapshot
 - **Data Source**: Yahoo Finance
 - **Metrics**: Trailing P/E, Forward P/E, Price/Cash Flow (P/CF), Dividend Yield, Market Cap
-- **Display**: Table grouped by custom categories (Platform Tech, Semiconductors, Enterprise Software, Commerce, Financials, Resources/Materials/Life Sciences)
+- **Display**: Table grouped by custom categories, including platform technology, chip design, manufacturing and foundries, optical networks, memory and storage, enterprise software, commerce, financials, life sciences, and energy
 
 ---
 

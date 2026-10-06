@@ -38,3 +38,11 @@ After replacing the ticker Gist, the newly added stocks still fell under `Other`
 
 ### Lesson
 When changing a live watchlist, check every downstream use of those symbols. If the email groups stocks by a separate static map, update that map and its current-list test as part of the change. Keep existing themes where they fit and check the size of each active group.
+
+## 2026-10-05: Large Themes Need a Business Fit Check
+
+### Issue
+The 19-stock semiconductor and hardware group mixed chip design, chip production, optics, storage, cloud hosting, and industrial manufacturing.
+
+### Lesson
+Check both group size and what each company sells. Split a broad group into clear subthemes when each can hold at least three current stocks. Move outliers to a more honest existing theme, and update mappings for inactive symbols so the old broad group cannot return when the watchlist changes.
