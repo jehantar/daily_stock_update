@@ -33,4 +33,6 @@ Final review: The free replacement removes every runtime Sharadar and Nasdaq key
 - [x] Check the current 42-stock theme map and company descriptions for the less obvious names.
 - [x] Split the 19-stock group into four smaller groups and move DOCN to platform technology; keep each new active group at four or more stocks.
 - [x] Run the full test suite and inspect the rendered email table. All 23 tests pass, and the table renders 42 stock rows with the four new headings in order.
-- [ ] Publish the theme update and record the final result.
+- [x] Publish the theme update through PR #11 after the 23-test and rendered-table checks.
+
+Final review: The 19-name group is now four active groups of 6, 4, 4, and 4. DOCN moved to the platform group. All 42 current stocks appear exactly once, no stock uses `Other`, and the only group below three remains the existing two-stock life-sciences section. The change affects email grouping only; no report data source or send logic changed.
